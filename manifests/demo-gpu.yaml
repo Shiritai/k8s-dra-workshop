@@ -1,0 +1,61 @@
+# Demo Workload for NVIDIA DRA (API v1)
+# This requires Kubernetes 1.34+ (or v1.32+ with feature gates)
+
+# 1. ResourceClaim: The request for the device
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: gpu-claim-1
+spec:
+  devices:
+    requests:
+    - name: req-1
+      exactly:
+        deviceClassName: gpu.nvidia.com # Provided by the driver
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: gpu-claim-2
+spec:
+  devices:
+    requests:
+    - name: req-1
+      exactly:
+        deviceClassName: gpu.nvidia.com
+---
+# 2. Pod: Consuming the claim
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-gpu-1
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sleep", "inf"]
+    resources:
+      claims:
+      - name: claim-ref-1 # Internal reference name
+  # Map the internal reference to the actual ResourceClaim
+  resourceClaims:
+  - name: claim-ref-1
+    resourceClaimName: gpu-claim-1
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-gpu-2
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sleep", "inf"]
+    resources:
+      claims:
+      - name: claim-ref-2
+  resourceClaims:
+  - name: claim-ref-2
+    resourceClaimName: gpu-claim-2
+  restartPolicy: Never
