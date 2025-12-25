@@ -10,10 +10,10 @@ dra-workshop/
 ├── 01-kind-setup.md      # [Module 1] 叢集建置 (核心技術)
 ├── 02-driver-install.md  # [Module 2] Driver 安裝
 ├── 03-workloads.md       # [Module 3] 驗證與實戰 (基礎獨佔)
-├── 04-consumable-capacity.md # [Module 4] 資源共享 (Consumable)
-├── 05-admin-access.md    # [Module 5] 管理員存取
-├── 06-resilience.md      # [Module 6] 韌性與調度
+├── k8s-dra-features.md   # Kubernetes DRA 功能演進詳情
 ├── scripts/              # 自動化腳本
+│   ├── common/           # 共用工具 (Teardown, Config Gen)
+│   └── phase1/           # Phase 1 執行腳本
 └── manifests/            # K8s YAML 檔案
 ```
 
@@ -25,7 +25,7 @@ dra-workshop/
 
 1.  **環境檢查**:
     ```bash
-    cd scripts
+    cd scripts/phase1
     ./run-module0-check-env.sh
     ```
 2.  **建立叢集**:
@@ -44,7 +44,7 @@ dra-workshop/
 ## 清理環境 (Clean Up)
 實驗結束後，執行以下指令可完全移除叢集：
 ```bash
-./run-teardown.sh
+../common/run-teardown.sh
 ```
 
 ## 技術亮點
@@ -62,6 +62,6 @@ dra-workshop/
 | [5075](https://github.com/kubernetes/enhancements/issues/5075) | Consumable Capacity   | **Alpha**       | **Alpha**       | Supports bandwidth/VRAM capacity sharing      |
 | [5018](https://github.com/kubernetes/enhancements/issues/5018) | Admin Access          | **Beta**        | **Beta**        | Used for device monitoring and debugging      |
 
-更多詳細資訊請參考 [Kubernetes Enhancements](https://github.com/kubernetes/enhancements)。
+更多詳細資訊請參考 [Kubernetes Enhancements](https://github.com/kubernetes/enhancements) 或檢視本專案整理的 [DRA 功能演進](k8s-dra-features.md)。
 
 Enjoy hacking! 🚀
