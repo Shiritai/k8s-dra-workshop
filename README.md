@@ -1,7 +1,8 @@
-# NVIDIA DRA (Structured Parameters) on Kind Workshop
+# k8s x NVIDIA DRA (Structured Parameters) on Kind Workshop
 
-歡迎來到 NVIDIA DRA 工作坊！
-本工作坊旨在協助 Kubernetes 工程師與開發者，在本地 Kind 環境中快速體驗並驗證 **Dynamic Resource Allocation (DRA)** 的 ResourceSlice 與 Structured Parameters 機制。
+歡迎來到 k8s x NVIDIA DRA 工作坊！
+
+本工作坊旨在協助 Kubernetes 工程師與開發者，在本地 Kind 環境中快速體驗並驗證 **Dynamic Resource Allocation (DRA)** 的 ResourceSlice 與 Structured Parameters 等機制。
 
 ## 專案結構
 ```
@@ -25,7 +26,7 @@ dra-workshop/
 
 ## 快速開始 (Quick Start)
 
-## 快速開始 (Quick Start)
+### Workshop Phase 1: Environment Setup & DRA Verification
 
 請依序執行以下步驟：
 
