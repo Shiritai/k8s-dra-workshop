@@ -9,6 +9,12 @@ MANIFEST="$WORKSHOP_DIR/manifests/demo-gpu.yaml"
 
 echo "=== NVIDIA DRA Workshop: Verification ==="
 
+# Preamble: Cleanup to ensure clean state
+echo "Step 0: Cleaning up previous workloads..."
+kubectl delete pod pod-gpu-1 pod-gpu-2 --force --grace-period=0 --ignore-not-found 2>/dev/null || true
+kubectl delete resourceclaim gpu-claim-1 gpu-claim-2 --ignore-not-found 2>/dev/null || true
+sleep 2
+
 echo "Step 1: Deploying workloads..."
 kubectl apply -f "$MANIFEST"
 
