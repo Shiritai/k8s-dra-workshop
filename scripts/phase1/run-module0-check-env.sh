@@ -61,5 +61,13 @@ else
     log_warn "nvidia-ctk not found (Recommended for CDI config verification)."
 fi
 
+# 4. Check MPS Daemon (Optional but required for Module 4)
+if pgrep -f "nvidia-cuda-mps-control" &> /dev/null; then
+    log_success "MPS Control Daemon is running."
+else
+    log_warn "MPS Control Daemon NOT found."
+    echo "    👉 Tip: Run 'nvidia-cuda-mps-control -d' on the host if you plan to use MPS."
+fi
+
 echo
 echo "=== 🎉 Environment Check Passed! ==="

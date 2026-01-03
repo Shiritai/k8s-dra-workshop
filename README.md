@@ -12,7 +12,9 @@ dra-workshop/
 │   │   ├── 00-prerequisites.md   # [Module 0] 環境準備
 │   │   ├── 01-kind-setup.md      # [Module 1] 叢集建置 (核心技術)
 │   │   ├── 02-driver-install.md  # [Module 2] Driver 安裝
-│   │   └── 03-workloads.md       # [Module 3] 驗證與實戰 (基礎獨佔)
+│   │   ├── 03-workloads.md       # [Module 3] 驗證與實戰 (基礎獨佔)
+│   │   ├── 04-mps-basics.md      # [Module 4] MPS 基礎 (空間共享)
+│   │   └── 05-mps-advanced.md    # [Module 5] MPS 進階 (資源控制)
 │   └── phase2/           # Phase 2: Advanced Features (Consumable)
 │       ├── 04-consumable-capacity.md # [Module 4] 資源共享 (Consumable) (Coming Soon)
 │       ├── 05-admin-access.md    # [Module 5] 管理員存取 (Coming Soon)
@@ -28,24 +30,18 @@ dra-workshop/
 
 ### Workshop Phase 1: Environment Setup & DRA Verification
 
-請依序執行以下步驟：
+### Phase 1: Getting Started
+1. **Check Environment**: `./scripts/phase1/run-module0-check-env.sh`
+2. **Setup Cluster**: `./scripts/phase1/run-module1-setup-kind.sh`
+3. **Install Driver**: `./scripts/phase1/run-module2-install-driver.sh`
+4. **Verify Workload**: `./scripts/phase1/run-module3-verify-workload.sh`
+5. **MPS Basics**: `./scripts/phase1/run-module4-mps-basics.sh`
+6. **MPS Advanced**: `./scripts/phase1/run-module5-mps-advanced.sh`
 
-1.  **環境檢查**:
-    ```bash
-    ./scripts/phase1/run-module0-check-env.sh
-    ```
-2.  **建立叢集**:
-    ```bash
-    ./scripts/phase1/run-module1-setup-kind.sh
-    ```
-3.  **安裝 Driver**:
-    ```bash
-    ./scripts/phase1/run-module2-install-driver.sh
-    ```
-4.  **驗證 Workload**:
-    ```bash
-    ./scripts/phase1/run-module3-verify-workload.sh
-    ```
+### Phase 2: DRA Features
+7. **Consumable Capacity**: `./scripts/phase2/run-module4-consumable-capacity.sh`
+8. **Admin Access**: `./scripts/phase2/run-module5-admin-access.sh`
+9. **Resilience**: `./scripts/phase2/run-module6-resilience.sh`
 
 ## 清理環境 (Clean Up)
 實驗結束後，執行以下指令可完全移除叢集：

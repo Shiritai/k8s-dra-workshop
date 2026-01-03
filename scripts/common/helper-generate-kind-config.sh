@@ -59,6 +59,17 @@ for dev in "${DEVICES[@]}"; do
           MOUNTS+="\n  - hostPath: $dev\n    containerPath: $dev"
     fi
 done
+# MPS Pipe Directory
+if [ -d "/tmp/nvidia-mps" ]; then
+    echo "  - Found MPS Pipe Directory (/tmp/nvidia-mps)"
+    MOUNTS+="\n  - hostPath: /tmp/nvidia-mps\n    containerPath: /tmp/nvidia-mps"
+fi
+
+# Shared Memory (Recommended for IPC)
+if [ -d "/dev/shm" ]; then
+    echo "  - Found /dev/shm"
+    MOUNTS+="\n  - hostPath: /dev/shm\n    containerPath: /dev/shm"
+fi
 
 # Escape newlines for sed
 ESCAPED_MOUNTS=$(echo -e "$MOUNTS" | sed ':a;N;$!ba;s/\n/\\n/g')

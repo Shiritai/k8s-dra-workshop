@@ -1,0 +1,43 @@
+# MPS Advanced Workload (DRA Enabled)
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: gpu-claim-limited
+spec:
+  devices:
+    requests:
+    - name: req-1
+      exactly:
+        deviceClassName: gpu.nvidia.com
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mps-limited
+spec:
+  hostIPC: true
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sleep", "inf"]
+    env:
+    - name: CUDA_MPS_PIPE_DIRECTORY
+      value: /tmp/nvidia-mps
+    - name: CUDA_MPS_ACTIVE_THREAD_PERCENTAGE
+      value: "20"
+    - name: CUDA_MPS_PINNED_DEVICE_MEM_LIMIT
+      value: "0=1G"
+    volumeMounts:
+    - mountPath: /tmp/nvidia-mps
+      name: mps-pipe
+    resources:
+      claims:
+      - name: claim-ref-limited
+  resourceClaims:
+  - name: claim-ref-limited
+    resourceClaimName: gpu-claim-limited
+  volumes:
+  - name: mps-pipe
+    hostPath:
+      path: /tmp/nvidia-mps
+  restartPolicy: Never
