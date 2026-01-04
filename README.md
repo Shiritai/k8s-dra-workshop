@@ -26,6 +26,32 @@ dra-workshop/
 └── manifests/            # K8s YAML 檔案
 ```
 
+## 模組相依性 (Module Dependencies)
+
+```mermaid
+graph TD
+    %% Nodes
+    M0[Module 0<br>Check Env]
+    M1[Module 1<br>Setup Kind]
+    M2[Module 2<br>Install Driver]
+    M3[Module 3<br>Verify Workload]
+    M4[Module 4<br>MPS Basics]
+    M5[Module 5<br>MPS Advanced]
+
+    %% Dependencies
+    M0 --> M1
+    M1 --> M2
+    M2 --> M3
+    M2 --> M4
+    M4 --> M5
+
+    %% Styling
+    classDef infra fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef workload fill:#bbf,stroke:#333,stroke-width:2px;
+    class M0,M1,M2 infra;
+    class M3,M4,M5 workload;
+```
+
 ## 快速開始 (Quick Start)
 
 ### Workshop Phase 1: Environment Setup & DRA Verification
