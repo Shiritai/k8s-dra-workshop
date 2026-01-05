@@ -61,12 +61,32 @@ else
     log_warn "nvidia-ctk not found (Recommended for CDI config verification)."
 fi
 
-# 4. Check MPS Daemon (Optional but required for Module 4)
-if pgrep -f "nvidia-cuda-mps-control" &> /dev/null; then
-    log_success "MPS Control Daemon is running."
+# 4. Check MPS Control Daemon
+if pgrep -f "nvidia-cuda-mps-control" >/dev/null; then
+    echo -e "${GREEN}✅  MPS Control Daemon is running.${NC}"
 else
-    log_warn "MPS Control Daemon NOT found."
-    echo "    👉 Tip: Run 'nvidia-cuda-mps-control -d' on the host if you plan to use MPS."
+    echo -e "${YELLOW}⚠️   MPS Control Daemon is NOT running.${NC}"
+    echo "    (Required for Module 4 & 5. Run 'nvidia-cuda-mps-control -d' on host)"
+fi
+
+# 5. Check MPS Pipe Permissions
+if [ -d "/tmp/nvidia-mps" ]; then
+    if [ -r "/tmp/nvidia-mps" ] && [ -w "/tmp/nvidia-mps" ] && [ -x "/tmp/nvidia-mps" ]; then
+         echo -e "${GREEN}✅  MPS Pipe Directory (/tmp/nvidia-mps) is accessible.${NC}"
+    else
+         echo -e "${YELLOW}⚠️   MPS Pipe Directory exists but may have permission issues.${NC}"
+         echo "    (Try 'chmod -R 777 /tmp/nvidia-mps' if pods fail to connect)"
+    fi
+else
+    echo -e "${YELLOW}⚠️   MPS Pipe Directory (/tmp/nvidia-mps) not found.${NC}"
+fi
+
+# 6. Check NVIDIA CTK CDI Config
+if nvidia-ctk cdi list >/dev/null 2>&1; then
+    echo -e "${GREEN}✅  NVIDIA CTK CDI is configured.${NC}"
+else
+    echo -e "${YELLOW}⚠️   NVIDIA CTK CDI config issue detected.${NC}"
+    echo "    (Ensure 'nvidia-ctk cdi generate' has been run)"
 fi
 
 echo
