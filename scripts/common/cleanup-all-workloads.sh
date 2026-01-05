@@ -17,13 +17,8 @@ for pod in $PODS; do
 done
 
 echo "Step 2: Deleting all potential ResourceClaims..."
-for claim in $CLAIMS; do
-    if kubectl get resourceclaim $claim >/dev/null 2>&1; then
-        echo "  - Deleting resourceclaim/$claim..."
-        # Try normal delete first
-        kubectl delete resourceclaim $claim --ignore-not-found --wait=false 2>/dev/null || true
-    fi
-done
+# Delete ALL resource claims to ensure no stale debugging artifacts remain
+kubectl delete resourceclaim --all --force --grace-period=0 --ignore-not-found --wait=false 2>/dev/null || true
 
 echo "Step 3: Waiting for resource termination..."
 sleep 2

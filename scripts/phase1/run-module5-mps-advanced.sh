@@ -7,6 +7,12 @@ MANIFEST="$WORKSHOP_DIR/manifests/demo-mps-limits.yaml"
 echo "=== Module 5: Verifying MPS Advanced (Resource Control) ==="
 source "$SCRIPT_DIR/run-module0-check-env.sh"
 
+# Cleanup previous run
+echo "Step 0: Cleaning up previous resources..."
+kubectl delete pod mps-limited --force --grace-period=0 --ignore-not-found 2>/dev/null || true
+kubectl delete resourceclaim gpu-claim-limited --ignore-not-found 2>/dev/null || true
+sleep 2
+
 echo "Step 1: Deploying MPS Workload with Limits..."
 kubectl apply -f "$MANIFEST"
 
