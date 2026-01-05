@@ -15,10 +15,8 @@ dra-workshop/
 │   │   ├── 03-workloads.md       # [Module 3] 驗證與實戰 (基礎獨佔)
 │   │   ├── 04-mps-basics.md      # [Module 4] MPS 基礎 (空間共享)
 │   │   └── 05-mps-advanced.md    # [Module 5] MPS 進階 (資源控制)
-│   └── phase2/           # Phase 2: Advanced Features (Consumable)
-│       ├── 04-consumable-capacity.md # [Module 4] 資源共享 (Consumable) (Coming Soon)
-│       ├── 05-admin-access.md    # [Module 5] 管理員存取 (Coming Soon)
-│       └── 06-resilience.md      # [Module 6] 韌性與調度 (Coming Soon)
+│   └── phase2/           # Phase 2: Advanced Features (Coming Soon)
+│       ├── ...           # Consumable Capacity, Admin Access, Resilience
 ├── k8s-dra-features.md   # Kubernetes DRA 功能演進詳情
 ├── scripts/              # 自動化腳本
 │   ├── common/           # 共用工具 (Teardown, Config Gen)
@@ -64,11 +62,6 @@ graph TD
 5. **MPS Basics**: `./scripts/phase1/run-module4-mps-basics.sh`
 6. **MPS Advanced**: `./scripts/phase1/run-module5-mps-advanced.sh`
 
-### Phase 2: DRA Features
-7. **Consumable Capacity**: `./scripts/phase2/run-module4-consumable-capacity.sh`
-8. **Admin Access**: `./scripts/phase2/run-module5-admin-access.sh`
-9. **Resilience**: `./scripts/phase2/run-module6-resilience.sh`
-
 ## 清理環境 (Clean Up)
 實驗結束後，執行以下指令可完全移除叢集：
 ```bash
@@ -79,6 +72,17 @@ graph TD
 - **Dynamic Library Discovery**: 自動偵測 Host 端 NVIDIA Driver 路徑並掛載至 Kind 節點，解決斷鏈問題。
 - **Automated Config Generation**: 自動生成包含正確 Mounts 的 Kind Config。
 - **Latest DRA API Support**: 支援 K8s 1.34+ `resource.k8s.io/v1` API。
+
+## 相容性矩陣 (Compatibility Matrix)
+
+| Component                    | Version Requirement | Notes                                                                |
+| :--------------------------- | :------------------ | :------------------------------------------------------------------- |
+| **Kubernetes**               | v1.34+              | Required for DRA Structured Parameters (GA).                         |
+| **NVIDIA Driver**            | v550+ (Recommended) | Tested with 550.54.14. Older versions may lack full DRA/MPS support. |
+| **NVIDIA Container Toolkit** | v1.14+              | Must support CDI generation (`nvidia-ctk cdi generate`).             |
+
+> [!TIP]
+> 遇到問題了嗎？請參考 [Troubleshooting Guide](docs/troubleshooting.md) 排除常見錯誤。
 
 ## Kubernetes DRA 功能演進 (Feature Matrix)
 
