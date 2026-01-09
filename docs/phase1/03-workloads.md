@@ -1,47 +1,47 @@
-# Module 3: 部署與驗證 Workloads
+# Module 3: Basic Workload Verification
 
-本章節將部署實際的 Pod 來驗證 DRA 的功能。
+Before diving into MPS sharing, we must verify the standard **Exclusive Allocation** flow. This confirms that the DRA driver is correctly intercepting Pod scheduling requests and injecting the GPU device.
 
-## ResourceClaim API (v1)
-在 K8s 1.34+ (Structured Parameters) 中，我們使用 `resource.k8s.io/v1` API。
-Pod 不再像過去那樣在 `resources.limits` 中直接寫 `nvidia.com/gpu: 1`，而是透過 `resourceClaims` 欄位引用一個獨立的 `ResourceClaim` 物件。
-
-範例 (`manifests/demo-gpu.yaml`):
-
-```yaml
-kind: ResourceClaim
-spec:
-  devices:
-    requests:
-    - name: req-1
-      exactly:
-        deviceClassName: gpu.nvidia.com
----
-kind: Pod
-spec:
-  resourceClaims:
-  - name: claim-ref-1
-    resourceClaimName: gpu-claim-1 # 指向上面的 Claim
-```
-
-## 實驗步驟
-
-### 1. 部署 Demo
+## 1. Deploy Workload
+Run the verification script:
 ```bash
-cd scripts
-./run-module3-verify-workload.sh
+./scripts/phase1/run-module3-verify-workload.sh
 ```
 
-### 2. 觀察調度行為
-- **Pod 1**: 應該會成功進入 `Running` 狀態，並能執行 `nvidia-smi`。
-- **Pod 2**: 若您的機器只有一張 GPU，Pod 2 將會處於 `Pending` 狀態。這是因為預設的 Claim 是 **獨佔 (Exclusive)** 的，整張卡被 Pod 1 佔用了。
+## 2. The Concept: ResourceClaim
+In DRA, scheduling is decoupled into three parts:
+1. **ResourceClass**: Defines "what" kind of device (e.g., `gpu.nvidia.com`).
+2. **ResourceClaim**: A request for a specific device instance (e.g., "Give me 1 GPU").
+3. **Pod**: References the Claim.
 
-## 進階主題：共享 GPU (Consumable Capacity)
-若要讓多個 Pod 共享同一張 GPU，需要在 Claim 中指定更細粒度的參數：
-- **Admin Access**: [KEP-5018](https://github.com/kubernetes/enhancements/issues/5018) 提供管理員專用的存取模式。
-- **Consumable Capacity**: [KEP-5075](https://github.com/kubernetes/enhancements/issues/5075) 支援 VRAM/Bandwidth 等可消耗資源的共享。
+### Sample Manifest (`manifests/demo-gpu.yaml`)
+```yaml
+apiVersion: resource.k8s.io/v1alpha2
+kind: ResourceClaim
+metadata:
+  name: gpu-claim-1
+spec:
+  resourceClassName: gpu.nvidia.com
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-gpu-1
+spec:
+  containers:
+  - name: ctr
+    image: nvidia/cuda:11.7.1-base-ubuntu22.04
+    resources:
+      claims:
+      - name: claim-1 # Links to the Claim Template below
+  resourceClaims:
+  - name: claim-1
+    resourceClaimName: gpu-claim-1 # Binds to the actual ResourceClaim object
+```
 
---
-[回到首頁](../README.md)
+## 3. Verification Details
+The script performs two key checks:
+1. **Successful Run**: `pod-gpu-1` should reach `Running` state and execute `nvidia-smi`.
+2. **Exclusive Lock**: `pod-gpu-2` (if deployed on a single-GPU node) should stay `Pending` because the first claim has exclusively reserved the GPU.
 
-
+*If this passes, your DRA scheduler and CDI injection are working correctly.*

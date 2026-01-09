@@ -1,57 +1,36 @@
-# Module 4: MPS Basics (Spatial Sharing)
+# Module 4: MPS Basics (Enabling Spatial Sharing)
 
-本章節將引導您啟用 NVIDIA MPS (Multi-Process Service)，體驗比傳統 Context Switching 更高效的 Spatial Sharing。
+Now that we have verified exclusive access, we move to **Spatial Sharing**. This module verifies the infrastructure (IPC bridging) required to support multiple clients on a single GPU.
 
-## 概念
-當多個 Pod 共享同一顆 GPU 時，預設行為是 **Time-Slicing (Temporal Sharing)**，即輪流使用 GPU。
-啟用 MPS 後，多個行程可同時在 GPU 上執行 (**Spatial Sharing**)，提升小模型或低負載任務的總吞吐量。
+## 1. Goal
+Confirm that a Pod can "see" and "talk" to the **In-Cluster MPS Daemon** running inside the Kind Node. If this fails, resource sharing (Module 5) will be impossible.
 
-## 架構要求
-1.  **Host 端**: 必須執行 MPS Control Daemon (`nvidia-cuda-mps-control -d`)。
-2.  **Kind Node**: 必須掛載 Host 的 IPC Pipe (`/tmp/nvidia-mps`)。
-3.  **Pod**: 必須能存取該 Pipe (透過 `hostIPC: true` 或 Volume Mount)。
-
-## 實作步驟
-1.  **啟動 Daemon (Host)**:
-    ```bash
-    nvidia-cuda-mps-control -d
-    ```
-2.  **執行驗證**:
-    ```bash
-    ./scripts/phase1/run-module4-mps-basics.sh
-    ```
-3.  **預期結果**:
-    - Script 會部署 `mps-basic` Pod。
-    - Pod 內部執行 `echo ps | nvidia-cuda-mps-control` 成功回傳 Daemon 狀態。
-    - 代表 Pod 成功「穿透」Kind Node 連線至 Host 的 MPS 服務。
-
-## 效果展示 (Demo)
-當 MPS 啟用時，您在 Host 端執行 `nvidia-smi` 將會看到 `nvidia-cuda-mps-server` 作為主要代理人，而 Pod 內的 Process (Type M) 則作為客戶端連線：
-
-```text
-Mon Jan  5 10:36:01 2026       
-+-----------------------------------------------------------------------------------------+
-| NVIDIA-SMI 580.95.05              Driver Version: 580.95.05      CUDA Version: 13.0     |
-+-----------------------------------------+------------------------+----------------------+
-| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
-| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
-|                                         |                        |               MIG M. |
-|=========================================+========================+======================|
-|   0  NVIDIA GeForce RTX 4090        Off |   00000000:01:00.0 Off |                  Off |
-|  0%   35C    P8              5W /  450W |     228MiB /  24564MiB |      0%      Default |
-|                                         |                        |                  N/A |
-+-----------------------------------------+------------------------+----------------------+
-
-+-----------------------------------------------------------------------------------------+
-| Processes:                                                                              |
-|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
-|        ID   ID                                                               Usage      |
-|=========================================================================================|
-|    0   N/A  N/A            1001      C   nvidia-cuda-mps-server                         28MiB |
-|    0   N/A  N/A            2001      M   /app/sample_workload                          200MiB |
-+-----------------------------------------------------------------------------------------+
+## 2. Architecture
+```mermaid
+graph TD
+    subgraph Kind Node
+        D[MPS Daemon]
+        S[Shared Memory /dev/shm]
+    end
+    subgraph Pod
+        C[CUDA App]
+    end
+    C <-->|IPC /dev/shm| D
 ```
-*(註：PID 與具體數值僅供參考，實際結果依環境而異)*
+We use `hostIPC: true` and mount `/dev/shm` to bridge the isolation gap.
 
----
-[下一章: MPS Advanced (Resource Control)](./05-mps-advanced.md)
+## 3. Verification
+Run the verification script:
+```bash
+./scripts/phase1/run-module4-mps-basics.sh
+```
+
+### What happens?
+1. **Deploy Pod**: `mps-basic` (with `hostIPC: true`).
+2. **Connectivity Check**: The script executes `echo ps | nvidia-cuda-mps-control` *inside* the Pod.
+3. **Success Criteria**: If the Daemon responds with a process list (even empty), the connection is established. This proves the pipe `/tmp/nvidia-mps` and shared memory are correctly propagating from Node to Pod.
+
+## 4. Troubleshooting
+- **"Connection Refused"**: Usually means `/dev/shm` is not mounted shared or the daemon is dead.
+  - Check Node daemon: `docker exec workshop-dra-control-plane ps aux | grep mps`
+- **"File not found"**: The pipe directory `/tmp/nvidia-mps` might not be mounted. Check the Pod spec `volumeMounts`.
