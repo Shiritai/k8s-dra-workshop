@@ -11,15 +11,15 @@ echo "=== NVIDIA DRA Workshop: Verification ==="
 
 # Preamble: Cleanup to ensure clean state
 echo "Step 0: Cleaning up previous workloads..."
-kubectl delete pod pod-gpu-1 pod-gpu-2 --force --grace-period=0 --ignore-not-found 2>/dev/null || true
-kubectl delete resourceclaim gpu-claim-1 gpu-claim-2 --ignore-not-found 2>/dev/null || true
+kubectl delete pod --all --force --grace-period=0 2>/dev/null || true
+kubectl delete resourceclaim --all 2>/dev/null || true
 sleep 2
 
 echo "Step 1: Deploying workloads..."
 kubectl apply -f "$MANIFEST"
 
 echo "Step 2: Waiting for scheduling..."
-# 簡單的等待迴圈
+# Simple waiting loop
 for i in {1..30}; do
     POD_STATUS=$(kubectl get pod pod-gpu-1 -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
     if [ "$POD_STATUS" == "Running" ]; then

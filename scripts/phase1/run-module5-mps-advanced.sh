@@ -8,9 +8,10 @@ echo "=== Module 5: Verifying MPS Advanced (Resource Control) ==="
 source "$SCRIPT_DIR/run-module0-check-env.sh"
 
 # Cleanup previous run
+# Cleanup previous run and ANY leftover claims from previous modules
 echo "Step 0: Cleaning up previous resources..."
-kubectl delete pod mps-limited --force --grace-period=0 --ignore-not-found 2>/dev/null || true
-kubectl delete resourceclaim gpu-claim-limited --ignore-not-found 2>/dev/null || true
+kubectl delete pod --all --force --grace-period=0 2>/dev/null || true
+kubectl delete resourceclaim --all 2>/dev/null || true
 sleep 2
 
 echo "Step 1: Deploying MPS Workload with Limits..."
@@ -29,13 +30,61 @@ else
     exit 1
 fi
 
-echo "Step 4: Verifying Memory Limit..."
-MEM_LIMIT=$(kubectl exec mps-limited -- bash -c "echo \$CUDA_MPS_PINNED_DEVICE_MEM_LIMIT")
-if [[ "$MEM_LIMIT" == *"0=1G"* ]]; then
-    echo "✅ Success! Memory Limit set to 1G for Device 0."
+
+# Create a test CUDA program
+echo "Step 3: Creating CUDA Test Program..."
+kubectl exec mps-limited -- bash -c "cat <<EOF > /tmp/mps_test.cu
+#include <cuda_runtime.h>
+#include <iostream>
+#include <string>
+
+int main(int argc, char* argv[]) {
+    size_t size_mb = std::stoul(argv[1]);
+    size_t size = size_mb * 1024 * 1024;
+    void* d_ptr;
+    cudaError_t err = cudaMalloc(&d_ptr, size);
+    
+    if (err == cudaSuccess) {
+        std::cout << \"Allocated \" << size_mb << \"MB successfully\" << std::endl;
+        cudaFree(d_ptr);
+        return 0; // Success
+    } else {
+        std::cout << \"Allocation failed: \" << cudaGetErrorString(err) << std::endl;
+        return 1; // Failed
+    }
+}
+EOF"
+
+
+echo "Step 4: Compiling CUDA Test..."
+kubectl exec mps-limited -- nvcc /tmp/mps_test.cu -o /tmp/mps_test
+
+echo "Step 5: Running Sanity Check (100MB)..."
+echo "Step 5: Running Sanity Check (100MB)..."
+if kubectl exec mps-limited -- /tmp/mps_test 100; then
+    echo "✅ Sanity Check Passed: MPS is alive."
+    
+    echo "Step 6: Running OOM Stress Test (2GB)..."
+    if ! kubectl exec mps-limited -- /tmp/mps_test 2048; then
+        echo "✅ Success! Memory limit enforced (Allocation failed as expected)."
+    else
+        echo "❌ Failed. Allocated 2GB despite 1GB limit."
+        exit 1
+    fi
 else
-    echo "❌ Failed. Memory limit is '$MEM_LIMIT' (Expected: 0=1G...)."
+    echo "❌ Sanity Check Failed: Could not allocate 100MB. MPS might be broken."
     exit 1
 fi
+
+echo "Step 7: Verifying Config Injection (Driver Functionality)..."
+MEM_LIMIT=$(kubectl exec mps-limited -- bash -c "echo \$CUDA_MPS_PINNED_DEVICE_MEM_LIMIT")
+if [[ "$MEM_LIMIT" == *"0=1G"* ]]; then
+    echo "✅ Success! Memory Limit Env Var injected correctly."
+else
+    echo "❌ Failed. Env Var missing."
+    exit 1
+fi
+
+
 
 echo "=== Module 5 Passed ==="

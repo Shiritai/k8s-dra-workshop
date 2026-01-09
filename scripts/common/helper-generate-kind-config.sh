@@ -19,6 +19,9 @@ TARGETS=(
     "/usr/bin/nvidia-smi"
     "/usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1"
     "/usr/lib/x86_64-linux-gnu/libcuda.so.1"
+    "/usr/lib/x86_64-linux-gnu/libnvidia-ptxjitcompiler.so.1"
+    "/usr/bin/nvidia-cuda-mps-control"
+    "/usr/bin/nvidia-cuda-mps-server"
 )
 
 MOUNTS=""
@@ -59,11 +62,7 @@ for dev in "${DEVICES[@]}"; do
           MOUNTS+="\n  - hostPath: $dev\n    containerPath: $dev"
     fi
 done
-# MPS Pipe Directory
-if [ -d "/tmp/nvidia-mps" ]; then
-    echo "  - Found MPS Pipe Directory (/tmp/nvidia-mps)"
-    MOUNTS+="\n  - hostPath: /tmp/nvidia-mps\n    containerPath: /tmp/nvidia-mps"
-fi
+
 
 # Shared Memory (Recommended for IPC)
 if [ -d "/dev/shm" ]; then

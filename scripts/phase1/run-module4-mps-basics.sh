@@ -8,9 +8,10 @@ echo "=== Module 4: Verifying MPS Basics (Spatial Sharing) ==="
 source "$SCRIPT_DIR/run-module0-check-env.sh"
 
 # Cleanup previous run
+# Cleanup previous run and ANY leftover claims from previous modules
 echo "Step 0: Cleaning up previous resources..."
-kubectl delete pod mps-basic --force --grace-period=0 --ignore-not-found 2>/dev/null || true
-kubectl delete resourceclaim gpu-claim-basic --ignore-not-found 2>/dev/null || true
+kubectl delete pod --all --force --grace-period=0 2>/dev/null || true
+kubectl delete resourceclaim --all 2>/dev/null || true
 sleep 2
 
 echo "Step 1: Deploying MPS Basic Workload..."
