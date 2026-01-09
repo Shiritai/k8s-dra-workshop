@@ -1,8 +1,8 @@
-# MPS Basic Workload (DRA Enabled)
+# MPS 1% Throttling Test
 apiVersion: resource.k8s.io/v1
 kind: ResourceClaim
 metadata:
-  name: gpu-claim-basic
+  name: gpu-claim-1pct
 spec:
   devices:
     requests:
@@ -13,7 +13,7 @@ spec:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: mps-basic
+  name: mps-1pct
 spec:
   hostIPC: true
   containers:
@@ -23,15 +23,19 @@ spec:
     env:
     - name: CUDA_MPS_PIPE_DIRECTORY
       value: /tmp/nvidia-mps
+    - name: CUDA_MPS_ACTIVE_THREAD_PERCENTAGE
+      value: "1"
+    - name: CUDA_MPS_PINNED_DEVICE_MEM_LIMIT
+      value: "0=1G"
     volumeMounts:
     - mountPath: /tmp/nvidia-mps
       name: mps-pipe
     resources:
       claims:
-      - name: claim-ref-basic
+      - name: claim-ref-1pct
   resourceClaims:
-  - name: claim-ref-basic
-    resourceClaimName: gpu-claim-basic
+  - name: claim-ref-1pct
+    resourceClaimName: gpu-claim-1pct
   volumes:
   - name: mps-pipe
     hostPath:

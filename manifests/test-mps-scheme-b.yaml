@@ -1,0 +1,98 @@
+# Scheme B: 3 pods sharing the SAME ResourceClaim (20% each)
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: gpu-claim-shared
+spec:
+  devices:
+    requests:
+    - name: req-1
+      exactly:
+        deviceClassName: gpu.nvidia.com
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mps-b1
+spec:
+  hostIPC: true
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sleep", "inf"]
+    env:
+    - name: CUDA_MPS_PIPE_DIRECTORY
+      value: /tmp/nvidia-mps
+    - name: CUDA_MPS_ACTIVE_THREAD_PERCENTAGE
+      value: "20"
+    volumeMounts:
+    - mountPath: /tmp/nvidia-mps
+      name: mps-pipe
+    resources:
+      claims:
+      - name: claim-ref
+  resourceClaims:
+  - name: claim-ref
+    resourceClaimName: gpu-claim-shared
+  volumes:
+  - name: mps-pipe
+    hostPath:
+      path: /tmp/nvidia-mps
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mps-b2
+spec:
+  hostIPC: true
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sleep", "inf"]
+    env:
+    - name: CUDA_MPS_PIPE_DIRECTORY
+      value: /tmp/nvidia-mps
+    - name: CUDA_MPS_ACTIVE_THREAD_PERCENTAGE
+      value: "20"
+    volumeMounts:
+    - mountPath: /tmp/nvidia-mps
+      name: mps-pipe
+    resources:
+      claims:
+      - name: claim-ref
+  resourceClaims:
+  - name: claim-ref
+    resourceClaimName: gpu-claim-shared
+  volumes:
+  - name: mps-pipe
+    hostPath:
+      path: /tmp/nvidia-mps
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mps-b3
+spec:
+  hostIPC: true
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sleep", "inf"]
+    env:
+    - name: CUDA_MPS_PIPE_DIRECTORY
+      value: /tmp/nvidia-mps
+    - name: CUDA_MPS_ACTIVE_THREAD_PERCENTAGE
+      value: "20"
+    volumeMounts:
+    - mountPath: /tmp/nvidia-mps
+      name: mps-pipe
+    resources:
+      claims:
+      - name: claim-ref
+  resourceClaims:
+  - name: claim-ref
+    resourceClaimName: gpu-claim-shared
+  volumes:
+  - name: mps-pipe
+    hostPath:
+      path: /tmp/nvidia-mps
