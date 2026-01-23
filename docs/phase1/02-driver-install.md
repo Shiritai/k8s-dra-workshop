@@ -1,40 +1,86 @@
 # Module 2: NVIDIA DRA Driver Installation
 
-With the environment ready and Kind cluster running (with MPS support), we now deploy the NVIDIA DRA Driver. This driver is responsible for discovering GPU resources and publishing them via the new **ResourceSlice** API.
+## 1. Overview
+The **NVIDIA DRA Driver** (Dynamic Resource Allocation) is the brain of this operation. Unlike the legacy "Device Plugin" which simply advertises an integer count of GPUs, the DRA driver manages GPUs as complex objects with attributes (memory, compute capability, topology).
 
-## 1. Installation
-Run the automated script:
+## 2. Component Architecture
+When installed, the driver deploys several components:
+1.  **DRA Controller**: Runs in the Control Plane. Handles the binding logic (which claim gets which GPU).
+2.  **Kubelet Plugin (Node Agent)**: Runs on every Node. Discovers local GPUs using CDI and publishes them as `ResourceSlices`.
+
+## 3. Installation Guide
+
+We use Helm for deployment. The script encapsulated the complexity:
+
 ```bash
 ./scripts/phase1/run-module2-install-driver.sh
 ```
 
-### Under the Hood (Helm Command)
-The script executes:
-```bash
-helm upgrade -i nvidia-dra-driver nvidia/nvidia-dra-driver-gpu \
-  --namespace nvidia-system \
-  --create-namespace \
-  --set gpuResourcesEnabledOverride=true \
-  --set kubeletPlugin.enabled=true \
-  --wait
-```
-- **`gpuResourcesEnabledOverride=true`**: Required for enabling the structured parameters feature (Key for DRA).
-- **`kubeletPlugin.enabled=true`**: Ensures the Node Agent (plugin) runs on every node to register devices.
+### Critical Helm Options
+We use specific experimental flags required for the current "Structured Parameters" model of DRA.
 
-## 2. Verification (ResourceSlice)
-The most critical indicator of success is the **ResourceSlice**. In DRA, devices are no longer just "counted" (like `nvidia.com/gpu: 1`); they are advertised as detailed objects.
+| Flag                          | Value  | Purpose                                                                                                                                   |
+| :---------------------------- | :----- | :---------------------------------------------------------------------------------------------------------------------------------------- |
+| `gpuResourcesEnabledOverride` | `true` | **Critical**. Enables the modern DRA APIs (Structured Parameters). Without this, the driver falls back to legacy modes or fails to start. |
+| `kubeletPlugin.enabled`       | `true` | Deploys the Node Agent responsible for `ResourceSlice` creation.                                                                          |
 
-Verify via:
+## 4. Verification: The ResourceSlice
+
+The **ResourceSlice** is the proof of life. It is a Custom Resource Definition (CRD) that represents a chunk of available hardware.
+
+**Command:**
 ```bash
 kubectl get resourceslices
 ```
 
-**Expected Output**:
-```text
-NAME                                           DRIVER                      POOL
-workshop-dra-control-plane-gpu.nvidia.com...   gpu.nvidia.com              workshop-dra...
+**Understanding the Object:**
+If you inspect the JSON output (`kubectl get resourceslices -o json`), you will see:
+
+```json
+{
+    "apiVersion": "resource.k8s.io/v1alpha2",
+    "kind": "ResourceSlice",
+    "metadata": { ... },
+    "spec": {
+        "driver": "gpu.nvidia.com",
+        "pool": {
+            "name": "workshop-dra-control-plane",
+            "generation": 1,
+            "resourceSliceCount": 1
+        },
+        "devices": [
+            {
+                "name": "gpu-0",
+                "basic": {
+                    "attributes": {
+                        "index": 0,
+                        "model": "NVIDIA GeForce RTX 4090",
+                        "memory": "24564MB"
+                    }
+                }
+            }
+        ]
+    }
+}
 ```
-If you see a ResourceSlice, the driver has successfully:
-1. Detected the GPU inside the Kind Node.
-2. Communicated with the Kubelet.
-3. Published the resource capability to the Control Plane.
+*Note: The actual attributes depend on the driver version.*
+
+## 5. Troubleshooting
+
+### "No ResourceSlices found"
+1.  **Check Pod Status**:
+    ```bash
+    kubectl get pods -n nvidia-system
+    ```
+    Ensure `nvidia-dra-driver-kubelet-plugin-*` is **Running**, not `Error` or `CrashLoopBackOff`.
+
+2.  **Check Logs**:
+    ```bash
+    kubectl logs -n nvidia-system -l app.kubernetes.io/name=nvidia-dra-driver-kubelet-plugin -c kubelet-plugin
+    ```
+    *   **"CDI spec not found"**: Indicates Module 0 (Prerequisites) failed.
+    *   **"NVML initialization failed"**: Indicates Module 1 (Kind Setup) mounts are wrong or missing libraries.
+
+## 6. Resources
+- [KEP-4381: DRA Structured Parameters](https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/4381-dra-structured-parameters)
+- [NVIDIA DRA Driver GitHub](https://github.com/NVIDIA/k8s-dra-driver)

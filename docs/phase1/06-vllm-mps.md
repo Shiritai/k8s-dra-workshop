@@ -1,57 +1,80 @@
-# Module 6: vLLM Verification with MPS
+# Module 6: vLLM Verification (Real-World Workload)
 
-## 1. Objective
+## 1. Overview
 
-This module aims to verify whether vLLM (LLM Inference Engine) can successfully start and perform inference tasks under NVIDIA MPS (Multi-Process Service) resource constraints. This is a fundamental step to confirm the effectiveness of the Kubernetes resource isolation mechanism.
+Thus far, we have verified MPS using synthetic CUDA benchmarks. Now, we face the "Final Boss": **vLLM**, a high-performance LLM inference engine.
+This module verifies that a complex, production-grade AI workload can run stably under the MPS constraints we established.
 
-## 2. Environment
+### Why vLLM?
+-   It uses advanced CUDA features (PagedAttention, CUDA Graphs).
+-   It is sensitive to memory availability (allocates KVCache aggressively).
+-   If MPS is broken or limits are handled incorrectly, vLLM will crash immediately.
 
-- **Kubernetes Cluster**: Kind (v1.32.0 node image)
-- **DRA Driver**: NVIDIA DRA Driver (v0.8.0+)
-- **GPU**: NVIDIA GPU (MPS support required, VRAM >= 8GB recommended)
-- **Model**: `Qwen/Qwen2.5-1.5B-Instruct`
-- **Inference Engine**: vLLM (v0.6.3+)
+## 2. Technical Architecture
 
-## 3. Execution Steps
+We deploy vLLM with a **50% Compute Limit**.
 
-We provide an automated script to execute the verification process:
+```mermaid
+graph TD
+    User[User Request] -->|HTTP| Service[vLLM Server]
+    Service -->|Inference| MPS_Client["MPS Client (inside Pod)"]
+    
+    subgraph "Kubernetes Node"
+        MPS_Client -->|System V IPC| Daemon[MPS Daemon]
+        Daemon -->|Enforcement| GPU[Physical GPU]
+    end
 
-1. Clean up existing vLLM Pod and ResourceClaim.
-2. Deploy vLLM Server with **MPS Active Thread Percentage** limit (default 50%).
-3. Wait for the Server to be ready.
-4. Send a simple inference request.
-5. Verify if text is generated successfully.
+    GPU -->|Limit: 50% SMs| Kernel[PagedAttention Kernel]
+```
 
-Command:
+## 3. Implementation Details
 
+We use `scripts/phase1/run-module6-vllm-verify.sh`.
+
+### 3.1. The Workload
+-   **Model**: `Qwen/Qwen2.5-1.5B-Instruct` (Small enough for workshop GPUs, representative architecture).
+-   **Configuration**:
+    -   `gpu-memory-utilization`: 0.9 (Aggressive VRAM usage).
+    -   `MPS Active Thread Percentage`: **50%**.
+
+### 3.2. Verification Flow
+1.  **Deployment**: Creates a Pod with a custom ResourceClaim.
+2.  **Health Check**: Polls `http://localhost:8000/health`.
+3.  **Inference**: Sends a completion request ("Hello, Kubernetes!").
+
+## 4. Execution & Verification
+
+Run the verification:
 ```bash
 ./scripts/phase1/run-module6-vllm-verify.sh
 ```
 
-## 4. Expected Result
+### Success Criteria
+1.  **Deployment Success**: Pod reaches `Running` state.
+2.  **Server Healthy**: vLLM initialization completes (can take 1-2 mins to load weights).
+3.  **Inference Output**:
+    ```json
+    {
+        "model": "Qwen/Qwen2.5-1.5B-Instruct",
+        "choices": [{ "text": "..." }]
+    }
+    ```
+    > "✅ Verification Successful: vLLM generated text under MPS constraints."
 
-If verification is successful, you will see output similar to the following:
+## 5. Troubleshooting
 
-```text
-Step 4: Running Inference Verification...
-Inference Output:
-{
-    "id": "cmpl-...",
-    "object": "text_completion",
-    "created": ...,
-    "model": "Qwen/Qwen2.5-1.5B-Instruct",
-    "choices": [
-        {
-            "text": "...",
-            ...
-        }
-    ],
-    ...
-}
+### "Worker initialization failed: CUDA error"
+-   **Cause**: MPS Pipe not mounted or permissions issue.
+-   **Fix**: Check Module 4 verification.
 
-✅ Verification Successful: vLLM generated text under MPS constraints.
-```
+### "OOM / Out of Memory"
+-   **Cause**: The GPU has insufficient VRAM for the 1.5B model + KVCache.
+-   **Fix**: Reduce `gpu-memory-utilization` in the script/manifest or check if other processes are hogging the GPU (run `nvidia-smi` on host).
 
-This confirms that:
-1. MPS resource limits are effective (Pod successfully scheduled and running).
-2. vLLM can operate normally under restricted compute resources.
+### "Timeout waiting for vLLM server"
+-   **Cause**: Model download is slow or MPS throttling is too aggressive (e.g., <10%).
+-   **Fix**: Check pod logs: `kubectl logs vllm-server`.
+
+## 6. References
+-   [vLLM Documentation](https://docs.vllm.ai/en/latest/)
+-   [NVIDIA MPS: Volta+ Architectures](https://docs.nvidia.com/deploy/mps/index.html)

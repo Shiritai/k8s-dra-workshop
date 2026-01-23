@@ -1,41 +1,83 @@
 # Module 1: Kind Cluster Setup (In-Cluster MPS Architecture)
 
-Because this workshop requires **MPS (Multi-Process Service)**, we cannot use a standard Kind cluster. MPS relies on IPC (Inter-Process Communication) via shared memory (`/dev/shm`) and specific pipes, which are isolated by default in Kind.
+## 1. Overview
+In this module, we construct a specialized Kubernetes cluster capable of **In-Cluster MPS**.
+Standard Kind clusters are "Docker-in-Docker" environments. They isolate the Node from the Host's GPU runtime. To enable high-performance spatial sharing (MPS), we must surgically break this isolation.
 
-To solve this, we implement an **In-Cluster MPS Architecture**:
-1. Mount the Host's MPS binaries and libraries into the Kind Node container.
-2. Start the MPS Control Daemon *inside* the Node container.
-3. Use `/dev/shm` bridging to allow Pods to talk to this Node-local daemon.
+## 2. Architecture: "The Fake Daemon" Pattern
 
-## 1. Automated Setup
-We provide scripts to handle the complex configuration automatically:
+Kubernetes Pods communicate with MPS via shared memory (`/dev/shm`) and specific IPC pipes (`/tmp/nvidia-mps`).
+In a Kind environment, we face a **Namespace Gap**:
+- **Host MPS**: Runs in Host PID/IPC namespace.
+- **Kind Node**: Runs in Docker Container namespace.
+- **Pod**: Runs in Container namespace (inside Kind).
 
-```bash
-./scripts/phase1/run-module1-setup-kind.sh
+To bridge this, we implement the **Pass-through Architecture**:
+
+```mermaid
+flowchart TD
+    subgraph Host ["Host Machine (Real Hardware)"]
+        RT[NVIDIA Runtime]
+        LIB[Libcuda / Libnvidia-ml]
+        CDI[CDI Spec /etc/cdi]
+    end
+
+    subgraph KindNode ["Kind Node (Docker Container)"]
+        Init([Node Init Process])
+        Daemon["MPS Daemon (Proxy)"]
+        Socket["/tmp/nvidia-mps"]
+        
+        subgraph Pod ["Workload Pod"]
+            App[vLLM / CUDA App]
+        end
+    end
+
+    LIB -->|Mount --readonly| KindNode
+    CDI -->|Mount --readonly| KindNode
+    
+    Init -->|Start| Daemon
+    Daemon -->|IPC Pipe| Socket
+    App -->|Mount| Socket
 ```
 
-## 2. Technical Details
+## 3. Implementation Logic
 
-### Kind Configuration Generator
-The script `scripts/common/helper-generate-kind-config.sh` dynamically discovers your host's NVIDIA environment and generates a `kind-config.yaml`.
+We use `scripts/phase1/run-module1-setup-kind.sh` to automate this complex setup.
 
-It mounts the following critical components:
-- **Binaries**: `nvidia-smi`, `nvidia-cuda-mps-control`, `nvidia-cuda-mps-server`.
-- **Libraries**: `libnvidia-ml`, `libcuda`, and **`libnvidia-ptxjitcompiler`** (Crucial for CUDA JIT compilation inside containers).
-- **IPC**: `/dev/shm` (System V Shared Memory).
-- **CDI**: `/etc/cdi/nvidia.yaml` (For device injection).
+### 3.1. Dynamic Config Generation
+The script invokes `helper-generate-kind-config.sh`, which performs a "Host Inspection":
+1.  **Locate Libraries**: Finds where `libnvidia-ml.so`, `libcuda.so`, and `libnvidia-ptxjitcompiler.so` live on your specific OS.
+2.  **Generate `extraMounts`**: Writes a `kind-config.yaml` that maps these host paths to uniform locations inside the Kind node (e.g., `/usr/lib/x86_64-linux-gnu/`).
 
-### Verification
-After the script completes, you can verify the In-Cluster MPS daemon is running:
+### 3.2. Daemon Initialization
+Once the cluster is up, the script executes:
+```bash
+docker exec workshop-dra-control-plane nvidia-cuda-mps-control -d
+```
+This starts the MPS Control Daemon **inside the Node container**.
+- It uses the *mounted* host binaries.
+- It sees the *real* GPU via the NVIDIA Runtime passed to Docker.
+- It creates the control pipe at `/tmp/nvidia-mps`.
 
+## 4. Verification
+
+After execution, verifying the "Fake Daemon" is running is critical.
+
+**Command:**
 ```bash
 docker exec workshop-dra-control-plane ps aux | grep mps
 ```
-*Expected Output:*
-```
+
+**Success Output:**
+```text
 root ... /usr/bin/nvidia-cuda-mps-control -d
 root ... /usr/bin/nvidia-cuda-mps-server
 ```
 
-### Why "In-Cluster"?
-Standard approaches often run MPS on the *Host* and bind-mount `/tmp/nvidia-mps`. However, Kind nodes run in a separate IPC namespace. Even with `hostIPC: true` in a Pod, the Pod only sees the *Node's* IPC, not the *Host's* IPC. By moving the Daemon *into* the Node, we align the IPC namespaces (Node == Pod's Host), allowing standard `hostIPC` connectivity to work.
+### Common Failure Modes
+1.  **"Library not found" inside Node**: The generate script failed to find the correct library path on the host. Check `manifests/kind-config.yaml`.
+2.  **MPS Server fails to start**: Often due to `/dev/shm` size limits. Our config sets `shm-size="8g"` to avoid OOM or Bus Errors during IPC.
+
+## 5. References
+- [Kind: Extra Mounts](https://kind.sigs.k8s.io/docs/user/configuration/#extra-mounts)
+- [NVIDIA MPS Documentation](https://docs.nvidia.com/deploy/mps/index.html)
