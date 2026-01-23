@@ -15,6 +15,16 @@ Phase 1 focuses on establishing a functional DRA environment with **MPS (Spatial
 | **03** | [Workloads](docs/phase1/03-workloads.md)           | Verify basic exclusive GPU scheduling.      |
 | **04** | [MPS Basics](docs/phase1/04-mps-basics.md)         | Enable Spatial Sharing (IPC Connectivity).  |
 | **05** | [MPS Advanced](docs/phase1/05-mps-advanced.md)     | Verify Resource Limits (Thread % & Memory). |
+| **06** | [vLLM Verification](docs/phase1/06-vllm-mps.md)    | Verify vLLM with MPS (Basic Check).         |
+| **06.5** | [vLLM Experiment](docs/phase1/06-vllm-experiment.md) | Sensitivity Analysis (MPS Impact).          |
+
+### Phase 2: Advanced Resource Management (Modules 7-9)
+
+| # | Module Name | Manifests | Scripts | Docs |
+| :--- | :--- | :--- | :--- | :--- |
+| 07 | Consumable Capacity | `demo-shared-capacity.yaml` | `run-module7-consumable-capacity.sh` | [Link](docs/phase2/07-consumable-capacity.md) |
+| 08 | Admin Access & Observability | `dcgm-exporter.yaml` | `run-module8-admin-access.sh` | [Link](docs/phase2/08-admin-access.md) |
+| 09 | Resilience & Recovery | `demo-mps-limits.yaml` | `run-module9-resilience.sh` | [Link](docs/phase2/09-resilience.md) |
 
 ## Module Dependencies
 
@@ -27,6 +37,8 @@ graph TD
     M3[Module 3: Workload]
     M4[Module 4: MPS Basics]
     M5[Module 5: MPS Advanced]
+    M6[Module 6: vLLM Verify]
+    M6.5[Module 6.5: vLLM Exp]
 
     %% Dependencies
     M0 --> M1
@@ -34,12 +46,14 @@ graph TD
     M2 --> M3
     M2 --> M4
     M4 --> M5
+    M5 --> M6
+    M6 --> M6.5
 
     %% Styling
     classDef infra fill:#f9f,stroke:#333,stroke-width:2px;
     classDef workload fill:#bbf,stroke:#333,stroke-width:2px;
     class M0,M1,M2 infra;
-    class M3,M4,M5 workload;
+    class M3,M4,M5,M6,M6.5 workload;
 ```
 
 ## Quick Start
@@ -57,6 +71,7 @@ graph TD
 ./scripts/phase1/run-module3-verify-workload.sh
 ./scripts/phase1/run-module4-mps-basics.sh
 ./scripts/phase1/run-module5-mps-advanced.sh
+./scripts/phase1/run-module6-vllm-verify.sh
 ```
 
 ## Phase 1 Verification Results (Empirical)
