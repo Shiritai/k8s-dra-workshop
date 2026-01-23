@@ -1,0 +1,47 @@
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: vllm-gpu-claim
+spec:
+  devices:
+    requests:
+    - name: req-1
+      exactly:
+        deviceClassName: gpu.nvidia.com
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vllm-server
+  labels:
+    app: vllm
+spec:
+  terminationGracePeriodSeconds: 0
+  containers:
+  - name: vllm
+    image: vllm/vllm-openai:latest
+    command: ["sleep", "inf"] # We will exec into it to run server/bench manually or via script
+    env:
+    - name: CUDA_MPS_PIPE_DIRECTORY
+      value: /tmp/nvidia-mps
+    - name: CUDA_MPS_ACTIVE_THREAD_PERCENTAGE
+      value: "100" # Default
+    volumeMounts:
+    - mountPath: /dev/shm
+      name: dshm
+    - mountPath: /tmp/nvidia-mps
+      name: mps-pipe
+    resources:
+      claims:
+      - name: claim-ref
+  resourceClaims:
+  - name: claim-ref
+    resourceClaimName: vllm-gpu-claim
+  volumes:
+  - name: dshm
+    emptyDir:
+      medium: Memory
+  - name: mps-pipe
+    hostPath:
+      path: /tmp/nvidia-mps
+  restartPolicy: Never
