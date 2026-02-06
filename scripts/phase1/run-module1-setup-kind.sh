@@ -26,7 +26,7 @@ fi
 
 # 3. Create Cluster
 echo "Step 2: Creating Kind cluster '$CLUSTER_NAME'..."
-kind create cluster --config "$WORKSHOP_DIR/manifests/kind-config.yaml" --name "$CLUSTER_NAME"
+kind create cluster --config "$WORKSHOP_DIR/manifests/module1/kind-config.yaml" --name "$CLUSTER_NAME"
 
 # 4. Verify GPU visibility in node
 if docker exec "${CLUSTER_NAME}-control-plane" nvidia-smi &> /dev/null; then

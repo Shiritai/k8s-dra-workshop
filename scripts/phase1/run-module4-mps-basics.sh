@@ -2,7 +2,7 @@
 set -e
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 WORKSHOP_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-MANIFEST="$WORKSHOP_DIR/manifests/demo-mps-basics.yaml"
+MANIFEST="$WORKSHOP_DIR/manifests/module4/demo-mps-basics.yaml"
 
 echo "=== Module 4: Verifying MPS Basics (Spatial Sharing) ==="
 source "$SCRIPT_DIR/run-module0-check-env.sh"

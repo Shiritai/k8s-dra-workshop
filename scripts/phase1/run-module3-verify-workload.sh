@@ -5,7 +5,7 @@ set -e
 
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 WORKSHOP_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-MANIFEST="$WORKSHOP_DIR/manifests/demo-gpu.yaml"
+MANIFEST="$WORKSHOP_DIR/manifests/module3/demo-gpu.yaml"
 
 echo "=== NVIDIA DRA Workshop: Verification ==="
 

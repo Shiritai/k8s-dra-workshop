@@ -4,8 +4,8 @@ set -e
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 WORKSHOP_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
-TEMPLATE_FILE="$WORKSHOP_DIR/manifests/kind-config.yaml.template"
-OUTPUT_FILE="$WORKSHOP_DIR/manifests/kind-config.yaml"
+TEMPLATE_FILE="$WORKSHOP_DIR/manifests/module1/kind-config.yaml.template"
+OUTPUT_FILE="$WORKSHOP_DIR/manifests/module1/kind-config.yaml"
 
 echo "=== Generating Kind Configuration ==="
 

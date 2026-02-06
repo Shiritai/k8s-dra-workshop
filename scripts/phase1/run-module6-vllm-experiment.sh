@@ -134,7 +134,7 @@ for run in "${RUNS[@]}"; do
         # Deploy with specific MPS percentage
         # We use sed to modify the manifest on the fly
         # Also replace claim name to avoid Kubelet stuck issues
-        sed "s/value: \"100\"/value: \"$pct\"/" "$MANIFEST_DIR/demo-vllm.yaml" | \
+        sed "s/value: \"100\"/value: \"$pct\"/" "$MANIFEST_DIR/module6/demo-vllm.yaml" | \
         sed "s/vllm-gpu-claim/$claim_name/g" | \
         kubectl create -f -
         

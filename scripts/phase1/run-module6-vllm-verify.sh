@@ -45,7 +45,7 @@ echo "Step 1: Cleaning up..."
 check_and_cleanup_pod "vllm-server" "$claim_name"
 
 echo "Step 2: Deploying vLLM with MPS Active Thread Percentage: $MPS_PCT%..."
-sed "s/value: \"100\"/value: \"$MPS_PCT\"/" "$MANIFEST_DIR/demo-vllm.yaml" | \
+sed "s/value: \"100\"/value: \"$MPS_PCT\"/" "$MANIFEST_DIR/module6/demo-vllm.yaml" | \
 sed "s/vllm-gpu-claim/$claim_name/g" | \
 kubectl create -f -
 

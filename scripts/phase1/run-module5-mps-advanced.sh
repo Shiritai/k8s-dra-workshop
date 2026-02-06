@@ -2,7 +2,7 @@
 set -e
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 WORKSHOP_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-MANIFEST="$WORKSHOP_DIR/manifests/demo-mps-limits.yaml"
+MANIFEST="$WORKSHOP_DIR/manifests/module5/demo-mps-limits.yaml"
 
 echo "=== Module 5: Verifying MPS Advanced (Resource Control) ==="
 source "$SCRIPT_DIR/run-module0-check-env.sh"

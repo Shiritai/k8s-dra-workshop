@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-mps-control-daemon
+  namespace: nvidia-system
+  labels:
+    app: nvidia-mps-control-daemon
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-mps-control-daemon
+  template:
+    metadata:
+      labels:
+        app: nvidia-mps-control-daemon
+    spec:
+      hostIPC: true
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      containers:
+      - name: mps-daemon
+        image: nvidia/cuda:12.3.1-base-ubuntu22.04
+        command: ["nvidia-cuda-mps-control", "-f"]
+        securityContext:
+          privileged: true
+        env:
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: "all"
+        - name: NVIDIA_DRIVER_CAPABILITIES
+          value: "compute,utility"
+        - name: CUDA_MPS_PIPE_DIRECTORY
+          value: /tmp/nvidia-mps
+        - name: CUDA_MPS_LOG_DIRECTORY
+          value: /tmp/nvidia-mps-log
+        volumeMounts:
+        - name: mps-pipe
+          mountPath: /tmp/nvidia-mps
+        - name: mps-log
+          mountPath: /tmp/nvidia-mps-log
+        - name: mps-bin-control
+          mountPath: /usr/bin/nvidia-cuda-mps-control
+        - name: mps-bin-server
+          mountPath: /usr/bin/nvidia-cuda-mps-server
+        - name: libcuda
+          mountPath: /usr/lib/x86_64-linux-gnu/libcuda.so
+        - name: libcuda-1
+          mountPath: /usr/lib/x86_64-linux-gnu/libcuda.so.1
+        - name: libcuda-ver
+          mountPath: /usr/lib/x86_64-linux-gnu/libcuda.so.580.95.05
+        - name: libnvidia-ml
+          mountPath: /usr/lib/x86_64-linux-gnu/libnvidia-ml.so
+        - name: libnvidia-ml-1
+          mountPath: /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1
+        - name: libnvidia-ml-ver
+          mountPath: /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.580.95.05
+      volumes:
+      - name: mps-pipe
+        hostPath:
+          path: /tmp/nvidia-mps
+          type: DirectoryOrCreate
+      - name: mps-log
+        hostPath:
+          path: /tmp/nvidia-mps-log
+          type: DirectoryOrCreate
+      - name: mps-bin-control
+        hostPath:
+          path: /usr/bin/nvidia-cuda-mps-control
+      - name: mps-bin-server
+        hostPath:
+          path: /usr/bin/nvidia-cuda-mps-server
+      - name: libcuda
+        hostPath:
+          path: /usr/lib/x86_64-linux-gnu/libcuda.so
+      - name: libcuda-1
+        hostPath:
+          path: /usr/lib/x86_64-linux-gnu/libcuda.so.1
+      - name: libcuda-ver
+        hostPath:
+          path: /usr/lib/x86_64-linux-gnu/libcuda.so.580.95.05
+      - name: libnvidia-ml
+        hostPath:
+          path: /usr/lib/x86_64-linux-gnu/libnvidia-ml.so
+      - name: libnvidia-ml-1
+        hostPath:
+          path: /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1
+      - name: libnvidia-ml-ver
+        hostPath:
+          path: /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.580.95.05

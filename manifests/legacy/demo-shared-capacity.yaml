@@ -1,0 +1,77 @@
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: gpu-shared-1
+spec:
+  devices:
+    requests:
+    - name: req-1
+      exactly:
+        deviceClassName: gpu-shared-kind.nvidia.com
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: gpu-shared-2
+spec:
+  devices:
+    requests:
+    - name: req-1
+      exactly:
+        deviceClassName: gpu-shared-kind.nvidia.com
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-shared-1
+spec:
+  hostIPC: true
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sleep", "inf"]
+    env:
+    - name: CUDA_MPS_PIPE_DIRECTORY
+      value: /tmp/nvidia-mps
+    volumeMounts:
+    - mountPath: /tmp/nvidia-mps
+      name: mps-pipe
+    resources:
+      claims:
+      - name: claim-ref-1
+  resourceClaims:
+  - name: claim-ref-1
+    resourceClaimName: gpu-shared-1
+  volumes:
+  - name: mps-pipe
+    hostPath:
+      path: /tmp/nvidia-mps
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-shared-2
+spec:
+  hostIPC: true
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sleep", "inf"]
+    env:
+    - name: CUDA_MPS_PIPE_DIRECTORY
+      value: /tmp/nvidia-mps
+    volumeMounts:
+    - mountPath: /tmp/nvidia-mps
+      name: mps-pipe
+    resources:
+      claims:
+      - name: claim-ref-2
+  resourceClaims:
+  - name: claim-ref-2
+    resourceClaimName: gpu-shared-2
+  volumes:
+  - name: mps-pipe
+    hostPath:
+      path: /tmp/nvidia-mps
+  restartPolicy: Never

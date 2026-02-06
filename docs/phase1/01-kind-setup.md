@@ -75,7 +75,7 @@ root ... /usr/bin/nvidia-cuda-mps-server
 ```
 
 ### Common Failure Modes
-1.  **"Library not found" inside Node**: The generate script failed to find the correct library path on the host. Check `manifests/kind-config.yaml`.
+1.  **"Library not found" inside Node**: The generate script failed to find the correct library path on the host. Check `manifests/module1/kind-config.yaml`.
 2.  **MPS Server fails to start**: Often due to `/dev/shm` size limits. Our config sets `shm-size="8g"` to avoid OOM or Bus Errors during IPC.
 
 ## 5. References

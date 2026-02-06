@@ -45,7 +45,7 @@ In the DRA Driver, configuring a ResourceClaim with "sharing enabled" triggers t
 However, **the Pod Spec is critical here**.
 The Driver does **not** automatically mount `/dev/shm` for you (security reasons). You must explicitly configure your Pod.
 
-### 4. Manifest Analysis (`manifests/demo-mps-basics.yaml`)
+### 4. Manifest Analysis (`manifests/module4/demo-mps-basics.yaml`)
 
 ```yaml
 apiVersion: v1

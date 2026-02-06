@@ -40,7 +40,7 @@ sequenceDiagram
 
 ## 4. Manifest Deep Dive
 
-Let's dissect `manifests/demo-gpu.yaml` to understand the binding.
+Let's dissect `manifests/module3/demo-gpu.yaml` to understand the binding.
 
 ### 4.1. The Claim
 ```yaml

@@ -1,0 +1,21 @@
+apiVersion: resource.k8s.io/v1
+kind: DeviceClass
+metadata:
+  name: gpu-shared-kind.nvidia.com
+spec:
+  selectors:
+  - cel:
+      expression: device.driver == 'gpu.nvidia.com'
+  config:
+  - opaque:
+      driver: gpu.nvidia.com
+      parameters:
+        apiVersion: resource.nvidia.com/v1alpha1
+        kind: DeviceClassParameters
+        spec:
+          sharing:
+            strategy: TimeSlicing
+            timeSlicingConfig:
+              resources:
+              - name: nvidia.com/gpu
+                replicas: 4

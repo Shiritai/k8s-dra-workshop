@@ -23,8 +23,8 @@ Phase 1 focuses on establishing a functional DRA environment with **MPS (Spatial
 | # | Module Name | Manifests | Scripts | Docs |
 | :--- | :--- | :--- | :--- | :--- |
 | 07 | Consumable Capacity | `demo-shared-capacity.yaml` | `run-module7-consumable-capacity.sh` | [Link](docs/phase2/07-consumable-capacity.md) |
-| 08 | Admin Access & Observability | `dcgm-exporter.yaml` | `run-module8-admin-access.sh` | [Link](docs/phase2/08-admin-access.md) |
-| 09 | Resilience & Recovery | `demo-mps-limits.yaml` | `run-module9-resilience.sh` | [Link](docs/phase2/09-resilience.md) |
+| 08 | Admin Access        | `demo-admin-access.yaml`    | `run-module8-admin-access.sh`        | [Link](docs/phase2/08-admin-access.md)        |
+| 09 | Resilience          | `demo-resilience.yaml`      | `run-module9-resilience.sh`          | [Link](docs/phase2/09-resilience.md)          |
 
 ## Module Dependencies
 
@@ -72,6 +72,12 @@ graph TD
 ./scripts/phase1/run-module4-mps-basics.sh
 ./scripts/phase1/run-module5-mps-advanced.sh
 ./scripts/phase1/run-module6-vllm-verify.sh
+
+# 5. Run Phase 2 (Advanced Features)
+# Note: These scripts include auto-cleanup to ensure idempotency.
+./scripts/phase2/run-module7-consumable-capacity.sh
+./scripts/phase2/run-module8-admin-access.sh
+./scripts/phase2/run-module9-resilience.sh
 ```
 
 ## Phase 1 Verification Results (Empirical)
@@ -91,6 +97,8 @@ We verified the MPS implementation with rigorous benchmarks using the following 
 - **In-Cluster MPS Architecture**: Runs the MPS control daemon *inside* the Kind node to resolve IPC namespace isolation issues.
 - **Dynamic Library Discovery**: Automatically finds and mounts Host NVIDIA libraries (including `libnvidia-ptxjitcompiler`) into the Kind node.
 - **Latest DRA API**: Supports Kubernetes `resource.k8s.io/v1` (Stable/Beta) APIs.
+- **Resilience**: Driver components are decoupled from workload execution (Module 9).
+- **Admin Bypass**: Native support for administrator access even on fully loaded nodes (Module 8).
 
 ## Cleanup
 ```bash

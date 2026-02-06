@@ -37,7 +37,7 @@ We use `scripts/phase1/run-module5-mps-advanced.sh`.
 This script is a comprehensive **Integration Test** that:
 
 1.  **Deploys a Limited Pod**:
-    -   Manifest: `manifests/demo-mps-limits.yaml`
+    -   Manifest: `manifests/module5/demo-mps-limits.yaml`
     -   Claim: "20% Compute, 1GB Memory"
 2.  **Validates Configuration**:
     -   Checks if env vars are correctly injected by the driver.
