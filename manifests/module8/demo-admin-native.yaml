@@ -1,0 +1,28 @@
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: claim-admin
+spec:
+  devices:
+    requests:
+    - name: req-1
+      exactly:
+        deviceClassName: gpu-admin.nvidia.com
+        adminAccess: true
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-admin
+spec:
+  hostIPC: true
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sleep", "inf"]
+    resources:
+      claims:
+      - name: claim-ref-1
+  resourceClaims:
+  - name: claim-ref-1
+    resourceClaimName: claim-admin
