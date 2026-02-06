@@ -1,0 +1,171 @@
+# Workload A: 4Gi Request (Should Succeed)
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: claim-small
+spec:
+  devices:
+    requests:
+    - name: req-1
+      exactly:
+        deviceClassName: gpu-capacity.nvidia.com
+        capacity:
+          requests:
+            memory: 4Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-small
+spec:
+  hostIPC: true
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sleep", "inf"]
+    env:
+    - name: CUDA_MPS_PIPE_DIRECTORY
+      value: /tmp/nvidia-mps
+    volumeMounts:
+    - mountPath: /tmp/nvidia-mps
+      name: mps-pipe
+    resources:
+      claims:
+      - name: claim-ref-1
+  resourceClaims:
+  - name: claim-ref-1
+    resourceClaimName: claim-small
+  volumes:
+  - name: mps-pipe
+    hostPath:
+      path: /tmp/nvidia-mps
+  restartPolicy: Never
+---
+# Workload A: 4Gi Request (Should Succeed)
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: claim-4gi
+spec:
+  devices:
+    requests:
+    - name: req-1
+      exactly:
+        deviceClassName: gpu-capacity.nvidia.com
+        capacity:
+          requests:
+            memory: 4Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-4gi
+spec:
+  hostIPC: true
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sleep", "inf"]
+    env:
+    - name: CUDA_MPS_PIPE_DIRECTORY
+      value: /tmp/nvidia-mps
+    volumeMounts:
+    - mountPath: /tmp/nvidia-mps
+      name: mps-pipe
+    resources:
+      claims:
+      - name: claim-ref-1
+  resourceClaims:
+  - name: claim-ref-1
+    resourceClaimName: claim-4gi
+  volumes:
+  - name: mps-pipe
+    hostPath:
+      path: /tmp/nvidia-mps
+  restartPolicy: Never
+---
+# Workload B: 18Gi Request (Should Succeed, filling the GPU)
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: claim-18gi
+spec:
+  devices:
+    requests:
+    - name: req-1
+      exactly:
+        deviceClassName: gpu-capacity.nvidia.com
+        capacity:
+          requests:
+            memory: 18Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-18gi
+spec:
+  hostIPC: true
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sleep", "inf"]
+    env:
+    - name: CUDA_MPS_PIPE_DIRECTORY
+      value: /tmp/nvidia-mps
+    volumeMounts:
+    - mountPath: /tmp/nvidia-mps
+      name: mps-pipe
+    resources:
+      claims:
+      - name: claim-ref-1
+  resourceClaims:
+  - name: claim-ref-1
+    resourceClaimName: claim-18gi
+  volumes:
+  - name: mps-pipe
+    hostPath:
+      path: /tmp/nvidia-mps
+  restartPolicy: Never
+---
+# Workload C: 4Gi Request (Should Pending, OOM at Scheduler level)
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: claim-overflow
+spec:
+  devices:
+    requests:
+    - name: req-1
+      exactly:
+        deviceClassName: gpu-capacity.nvidia.com
+        capacity:
+          requests:
+            memory: 50Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-overflow
+spec:
+  hostIPC: true
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sleep", "inf"]
+    env:
+    - name: CUDA_MPS_PIPE_DIRECTORY
+      value: /tmp/nvidia-mps
+    volumeMounts:
+    - mountPath: /tmp/nvidia-mps
+      name: mps-pipe
+    resources:
+      claims:
+      - name: claim-ref-1
+  resourceClaims:
+  - name: claim-ref-1
+    resourceClaimName: claim-overflow
+  volumes:
+  - name: mps-pipe
+    hostPath:
+      path: /tmp/nvidia-mps
+  restartPolicy: Never

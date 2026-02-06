@@ -1,0 +1,21 @@
+apiVersion: resource.k8s.io/v1
+kind: DeviceClass
+metadata:
+  name: gpu-capacity.nvidia.com
+spec:
+  selectors:
+  - cel:
+      expression: device.driver == 'gpu.nvidia.com'
+  config:
+  - opaque: # CONSTRAINT: Driver v1beta1 ONLY supports Opaque.
+      driver: gpu.nvidia.com
+      parameters:
+        # NOTE: Opaque params are invisible to Scheduler -> "Blind Scheduler".
+        # Result: Scheduler sees 1 Physical GPU, enforces 1-to-1 mapping.
+        # This prevents concurrent pod scheduling even with MPS/TimeSlicing enabled.
+        apiVersion: resource.nvidia.com/v1beta1
+        kind: GpuConfig
+        sharing:
+          strategy: MPS  # Use MPS to allow multiple processes (in a Pod) to share context, though in v1beta1 this does not create replicas.
+          mpsConfig:
+            defaultActiveThreadPercentage: 100 # Allow full compute access for the shared context

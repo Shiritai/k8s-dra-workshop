@@ -1,0 +1,23 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: nvidia-dra-driver-kubelet-plugin-deployments-role
+  namespace: nvidia-system
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nvidia-dra-driver-kubelet-plugin-deployments-binding
+  namespace: nvidia-system
+subjects:
+- kind: ServiceAccount
+  name: nvidia-dra-driver-nvidia-dra-driver-gpu-service-account-kubeletplugin
+  namespace: nvidia-system
+roleRef:
+  kind: Role
+  name: nvidia-dra-driver-kubelet-plugin-deployments-role
+  apiGroup: rbac.authorization.k8s.io

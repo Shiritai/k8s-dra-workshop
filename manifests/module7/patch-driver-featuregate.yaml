@@ -1,0 +1,13 @@
+spec:
+  template:
+    spec:
+      containers:
+      - name: gpus
+        args:
+        - |-
+          if [ "${MASK_NVIDIA_DRIVER_PARAMS}" = "true" ]; then
+            cp /proc/driver/nvidia/params root/gpu-params
+            sed -i 's/^ModifyDeviceFiles: 1$/ModifyDeviceFiles: 0/' root/gpu-params
+            mount --bind root/gpu-params /proc/driver/nvidia/params
+          fi
+          gpu-kubelet-plugin -v $(LOG_VERBOSITY) --feature-gates=TimeSlicingSettings=true,MPSSupport=true
