@@ -1,0 +1,27 @@
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: claim-resilience
+spec:
+  devices:
+    requests:
+    - name: req-1
+      exactly:
+        deviceClassName: gpu.nvidia.com
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-resilience
+spec:
+  restartPolicy: Never
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sleep", "inf"]
+    resources:
+      claims:
+      - name: claim-ref-resilience
+  resourceClaims:
+  - name: claim-ref-resilience
+    resourceClaimName: claim-resilience
