@@ -28,17 +28,34 @@ fi
 echo "Step 2: Creating Kind cluster '$CLUSTER_NAME'..."
 kind create cluster --config "$WORKSHOP_DIR/manifests/module1/kind-config.yaml" --name "$CLUSTER_NAME"
 
-# 4. Verify GPU visibility in node
-if docker exec "${CLUSTER_NAME}-control-plane" nvidia-smi &> /dev/null; then
-    echo "✅ Success: nvidia-smi is accessible inside the Kind node."
+# 4. Configure ldconfig inside node so nvidia-smi can find libraries
+echo "Step 3: Configuring ldconfig inside node for AArch64/x86_64 compatibility..."
+ARCH=$(uname -m)
+LIB_DIR="x86_64-linux-gnu"
+if [ "$ARCH" = "aarch64" ]; then
+    LIB_DIR="aarch64-linux-gnu"
+fi
+docker exec "${CLUSTER_NAME}-control-plane" bash -c "mkdir -p /etc/ld.so.conf.d && echo '/usr/lib/$LIB_DIR' > /etc/ld.so.conf.d/nvidia.conf && ldconfig"
+
+# 5. Verify GPU visibility in node
+# Note: In some virtualized/nested environments, nvidia-smi might return exit code 14 
+# due to "infoROM is corrupted", but still output valid GPU info.
+# We wrap it in a command group or use '|| true' to prevent 'set -e' from killing the script.
+NVIDIA_SMI_STATUS=0
+docker exec "${CLUSTER_NAME}-control-plane" nvidia-smi > nvidia_smi_out.tmp 2>&1 || NVIDIA_SMI_STATUS=$?
+
+if [ $NVIDIA_SMI_STATUS -eq 0 ] || [ $NVIDIA_SMI_STATUS -eq 14 ]; then
+    echo "✅ Success: nvidia-smi is accessible (Status: $NVIDIA_SMI_STATUS) inside the Kind node."
+    cat nvidia_smi_out.tmp
 else
-    echo "❌ Fail: nvidia-smi failed inside the node. Check mounts."
+    echo "❌ Fail: nvidia-smi failed inside the node with status $NVIDIA_SMI_STATUS. Check mounts."
+    cat nvidia_smi_out.tmp
     exit 1
 fi
+rm nvidia_smi_out.tmp
 
-# 5. Start In-Cluster MPS Daemon
+# 6. Start In-Cluster MPS Daemon
 echo "Step 4: Starting In-Cluster MPS Daemon..."
-# Start daemon in background (-d)
 docker exec "${CLUSTER_NAME}-control-plane" nvidia-cuda-mps-control -d
 
 # Verify

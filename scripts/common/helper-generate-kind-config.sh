@@ -14,12 +14,19 @@ resolve_path() {
     readlink -f "$1"
 }
 
+# Detect architecture dynamically
+ARCH=$(uname -m)
+LIB_DIR="x86_64-linux-gnu"
+if [ "$ARCH" = "aarch64" ]; then
+    LIB_DIR="aarch64-linux-gnu"
+fi
+
 # List of critical libraries/binaries to mount
 TARGETS=(
     "/usr/bin/nvidia-smi"
-    "/usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1"
-    "/usr/lib/x86_64-linux-gnu/libcuda.so.1"
-    "/usr/lib/x86_64-linux-gnu/libnvidia-ptxjitcompiler.so.1"
+    "/usr/lib/$LIB_DIR/libnvidia-ml.so.1"
+    "/usr/lib/$LIB_DIR/libcuda.so.1"
+    "/usr/lib/$LIB_DIR/libnvidia-ptxjitcompiler.so.1"
     "/usr/bin/nvidia-cuda-mps-control"
     "/usr/bin/nvidia-cuda-mps-server"
 )
@@ -51,9 +58,9 @@ fi
 
 # Also mount device nodes
 DEVICES=(
-    "/dev/nvidia0"
     "/dev/nvidiactl"
     "/dev/nvidia-uvm"
+    "/dev/nvidia-uvm-tools"
     "/dev/nvidia-modeset"
 )
 
@@ -62,6 +69,18 @@ for dev in "${DEVICES[@]}"; do
           MOUNTS+="\n  - hostPath: $dev\n    containerPath: $dev"
     fi
 done
+
+# Mount all available nvidia GPUs
+for dev in /dev/nvidia[0-9]*; do
+    if [ -e "$dev" ]; then
+          MOUNTS+="\n  - hostPath: $dev\n    containerPath: $dev"
+    fi
+done
+
+# Mount MIG capabilities (critical for A100)
+if [ -d "/dev/nvidia-caps" ]; then
+    MOUNTS+="\n  - hostPath: /dev/nvidia-caps\n    containerPath: /dev/nvidia-caps"
+fi
 
 
 # Shared Memory (Recommended for IPC)
