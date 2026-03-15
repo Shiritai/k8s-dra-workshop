@@ -8,7 +8,7 @@ check_dra_driver() {
     if kubectl get pods -n nvidia-system -l app.kubernetes.io/name=nvidia-dra-driver-gpu | grep -q "Running"; then
         echo "✅ Driver is running."
     else
-        echo "❌ Driver is NOT running. Please run 'scripts/quick-setup-phase2.sh' first."
+        echo "❌ Driver is NOT running. Please run 'scripts/phase1/run-module1-setup-kind.sh' and 'scripts/phase1/run-module2-install-driver.sh' first."
         exit 1
     fi
 }
