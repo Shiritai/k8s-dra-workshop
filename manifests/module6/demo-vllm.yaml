@@ -7,7 +7,7 @@ spec:
     requests:
     - name: req-1
       exactly:
-        deviceClassName: mig.nvidia.com
+        deviceClassName: gpu.nvidia.com
 ---
 apiVersion: v1
 kind: Pod

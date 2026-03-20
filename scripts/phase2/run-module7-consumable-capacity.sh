@@ -80,4 +80,8 @@ else
      exit 1
 fi
 
+echo "Step 4: Cleanup..."
+kubectl delete pod pod-small pod-4gi pod-18gi pod-overflow --force --grace-period=0 2>/dev/null || true
+kubectl delete resourceclaim claim-small claim-4gi claim-18gi claim-overflow --ignore-not-found
+
 echo "=== Module 7 Verification Complete (Capacity Logic Verified) ==="

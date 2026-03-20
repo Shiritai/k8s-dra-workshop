@@ -52,7 +52,7 @@ kubectl create -f -
 wait_for_pod_ready "vllm-server"
 
 echo "Step 2.5: Starting vLLM Server..."
-kubectl exec "vllm-server" -- bash -c "nohup vllm serve $MODEL_NAME --port 8000 --gpu-memory-utilization 0.9 > /tmp/vllm.log 2>&1 &"
+kubectl exec "vllm-server" -- bash -c "nohup vllm serve $MODEL_NAME --port 8000 --gpu-memory-utilization 0.9 --max-model-len 8192 > /tmp/vllm.log 2>&1 &"
 
 echo "Step 3: Waiting for vLLM Server to be healthy..."
 # Wait for server to be ready

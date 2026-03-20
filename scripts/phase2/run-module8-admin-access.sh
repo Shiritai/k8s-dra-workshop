@@ -8,10 +8,16 @@ CLASS_FILE="$WORKSHOP_DIR/manifests/module8/gpu-class-admin.yaml"
 echo "=== Module 8: Verifying Admin Access (Native) ==="
 source "$SCRIPT_DIR/check-env.sh"
 
-echo "Step 0: Cleanup..."
-# Force delete potential leftovers
-kubectl delete pod pod-owner pod-admin-native pod-admin --force --grace-period=0 2>/dev/null || true
-kubectl delete resourceclaim claim-owner claim-admin-native claim-admin --ignore-not-found
+kubectl delete pod pod-owner pod-admin-native pod-admin pod-gpu-1 pod-gpu-2 --force --grace-period=0 2>/dev/null || true
+kubectl delete resourceclaim claim-owner claim-admin-native claim-admin gpu-claim-1 gpu-claim-2 --ignore-not-found
+
+# Specialized Cleanup for stale ResourceClaims (Stale Checkpoints)
+if docker exec workshop-dra-control-plane [ -f /var/lib/kubelet/plugins/gpu.nvidia.com/checkpoint.json ]; then
+    echo "⚠️ Found stale Node Agent checkpoint. Cleaning up for clean allocation..."
+    docker exec workshop-dra-control-plane rm -f /var/lib/kubelet/plugins/gpu.nvidia.com/checkpoint.json
+    kubectl rollout restart ds nvidia-dra-driver-gpu-kubelet-plugin -n nvidia-system
+    kubectl rollout status ds nvidia-dra-driver-gpu-kubelet-plugin -n nvidia-system >/dev/null
+fi
 
 echo "Step 0.5: Preparing Namespace Security Label..."
 # Required for Admin Access in K8s 1.26+ DRA

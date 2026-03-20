@@ -20,4 +20,9 @@ if [ -f "$WORKSHOP_DIR/manifests/kind-config.yaml" ]; then
     echo "✅ Cleaned up generated config file."
 fi
 
+# Cleanup stale checkpoints inside node if cluster still alive (before deletion)
+if kind get clusters | grep -q "^$CLUSTER_NAME$"; then
+    docker exec "$CLUSTER_NAME-control-plane" rm -f /var/lib/kubelet/plugins/gpu.nvidia.com/checkpoint.json 2>/dev/null || true
+fi
+
 echo "=== Teardown Complete ==="
