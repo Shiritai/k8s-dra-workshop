@@ -51,18 +51,43 @@ kubectl create -f -
 
 wait_for_pod_ready "vllm-server"
 
-echo "Step 2.5: Starting vLLM Server..."
+echo "Step 2.5: Starting vLLM Server (Attempt 1: Default Backend)..."
 kubectl exec "vllm-server" -- bash -c "nohup vllm serve $MODEL_NAME --port 8000 --gpu-memory-utilization 0.9 --max-model-len 8192 > /tmp/vllm.log 2>&1 &"
 
-echo "Step 3: Waiting for vLLM Server to be healthy..."
-# Wait for server to be ready
-for i in {1..300}; do
+echo "Step 3: Waiting for vLLM Server to be healthy (with Auto-Fallback)..."
+# Monitor for success or specific kernel error
+for i in {1..150}; do
+    # Check if server is ready
     if kubectl exec "vllm-server" -- curl -s http://localhost:8000/health > /dev/null; then
-        echo "Server is ready."
+        echo "✅ Server is ready with default backend."
         break
     fi
-    if [ $i -eq 300 ]; then
-        echo "Timeout waiting for vLLM server."
+    
+    # Check for "no kernel image" error in logs
+    if kubectl exec "vllm-server" -- grep -q "no kernel image is available" /tmp/vllm.log; then
+        echo "⚠️ Detected missing CUDA kernels for this GPU. Falling back to TRITON_ATTN..."
+        # Kill previous process
+        kubectl exec "vllm-server" -- pkill -f vllm
+        sleep 2
+        # Restart with Triton and V0 Engine
+        echo "Attempting restart with VLLM_USE_V1=0 and --attention-backend TRITON_ATTN..."
+        kubectl exec "vllm-server" -- bash -c "export VLLM_USE_V1=0; nohup vllm serve $MODEL_NAME --port 8000 --gpu-memory-utilization 0.9 --max-model-len 8192 --attention-backend TRITON_ATTN > /tmp/vllm.log 2>&1 &"
+        
+        # New loop for Triton startup (often slower due to JIT)
+        for j in {1..300}; do
+            if kubectl exec "vllm-server" -- curl -s http://localhost:8000/health > /dev/null; then
+                echo "✅ Server is ready with TRITON_ATTN JIT backend."
+                break 2
+            fi
+            sleep 2
+        done
+        echo "Timeout waiting for vLLM server (Triton)."
+        kubectl exec "vllm-server" -- cat /tmp/vllm.log
+        exit 1
+    fi
+
+    if [ $i -eq 150 ]; then
+        echo "Timeout waiting for vLLM server (Default)."
         kubectl exec "vllm-server" -- cat /tmp/vllm.log
         exit 1
     fi

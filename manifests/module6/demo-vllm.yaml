@@ -19,7 +19,7 @@ spec:
   terminationGracePeriodSeconds: 0
   containers:
   - name: vllm
-    image: vllm/vllm-openai:latest
+    image: vllm/vllm-gh200-openai:latest
     command: ["sleep", "inf"] # We will exec into it to run server/bench manually or via script
     env:
     - name: CUDA_MPS_PIPE_DIRECTORY
