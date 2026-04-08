@@ -24,6 +24,8 @@ fi
 # List of critical libraries/binaries to mount
 TARGETS=(
     "/usr/bin/nvidia-smi"
+    "/usr/bin/nvidia-ctk"
+    "/usr/bin/nvidia-container-runtime"
     "/usr/lib/$LIB_DIR/libnvidia-ml.so.1"
     "/usr/lib/$LIB_DIR/libcuda.so.1"
     "/usr/lib/$LIB_DIR/libnvidia-ptxjitcompiler.so.1"
@@ -53,7 +55,7 @@ done
 # Also mount CDI directory if it exists
 if [ -d "/etc/cdi" ]; then
      echo "  - Found /etc/cdi"
-     MOUNTS+="\n  - hostPath: /etc/cdi\n    containerPath: /var/run/cdi\n    readOnly: true"
+     MOUNTS+="\n  - hostPath: /etc/cdi\n    containerPath: /etc/cdi"
 fi
 
 # Also mount device nodes
