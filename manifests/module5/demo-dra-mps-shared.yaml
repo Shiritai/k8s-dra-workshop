@@ -1,0 +1,67 @@
+# Module 5.5 Part B: DRA-Managed MPS Shared Claim (3 pods, same GPU)
+# Compare with Module 5 scheme-b: no hostIPC, no hostPath, no manual env.
+# All 3 pods share 1 ResourceClaim -> DRA driver manages single MPS daemon.
+
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: gpu-claim-dra-mps-shared
+spec:
+  devices:
+    config:
+    - opaque:
+        driver: gpu.nvidia.com
+        parameters:
+          apiVersion: resource.nvidia.com/v1beta1
+          kind: GpuConfig
+          sharing:
+            strategy: MPS
+            mpsConfig:
+              defaultActiveThreadPercentage: 30
+    requests:
+    - name: gpu-req
+      exactly:
+        count: 1
+        deviceClassName: gpu.nvidia.com
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dra-mps-s1
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "echo 'Shared Pod-1'; nvidia-smi; sleep 3600"]
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: gpu-claim-dra-mps-shared}]
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dra-mps-s2
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "echo 'Shared Pod-2'; nvidia-smi; sleep 3600"]
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: gpu-claim-dra-mps-shared}]
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dra-mps-s3
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "echo 'Shared Pod-3'; nvidia-smi; sleep 3600"]
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: gpu-claim-dra-mps-shared}]
+  restartPolicy: Never

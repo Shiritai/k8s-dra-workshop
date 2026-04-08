@@ -36,13 +36,17 @@ metadata:
 
 **Resource Claim:**
 ```yaml
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: claim-admin
 spec:
   devices:
-    config:
-    - opaque:
-        driver: gpu.nvidia.com
-        parameters:
-          adminAccess: true
+    requests:
+    - name: req-1
+      exactly:
+        deviceClassName: gpu-admin.nvidia.com
+        adminAccess: true    # <--- Bypasses exclusivity lock
 ```
 
 ### 1.4 Verification

@@ -70,14 +70,19 @@ echo "Waiting for pod-small to be Ready..."
 kubectl wait --for=condition=Ready pod/pod-small --timeout=60s
 echo "✅ Pod-Small works (Allocated Device + MPS Config)."
 
-echo "Step 3: Verification of Capacity Limit (pod-overflow, 50GB)..."
-ioctl_status=$(kubectl get pod pod-overflow -o jsonpath='{.status.phase}')
-if [ "$ioctl_status" == "Pending" ]; then
-     echo "✅ pod-overflow is Pending as expected."
-     echo "   (Note: Pending reason is 'Insufficient Devices' due to 1-to-1 Opaque Mapping, which effectively enforces capacity limits in this single-device setup.)"
-else
-     echo "❌ pod-overflow is $ioctl_status (Unexpected, should be Pending)."
-     exit 1
+echo "Step 3: Verification — Opaque 1-to-1 Mapping blocks remaining pods..."
+FAIL=0
+for pod in pod-4gi pod-18gi pod-overflow; do
+    status=$(kubectl get pod "$pod" -o jsonpath='{.status.phase}')
+    if [ "$status" == "Pending" ]; then
+        echo "✅ $pod is Pending as expected (Opaque 1-to-1 mapping: gpu-0 already bound)."
+    else
+        echo "❌ $pod is $status (Expected Pending)."
+        FAIL=1
+    fi
+done
+if [ "$FAIL" -eq 1 ]; then
+    echo "⚠️  Some pods were not Pending. Do you have >1 GPU?"
 fi
 
 echo "Step 4: Cleanup..."

@@ -41,7 +41,7 @@ spec:
       path: /tmp/nvidia-mps
   restartPolicy: Never
 ---
-# Workload A: 4Gi Request (Should Succeed)
+# Workload A2: 4Gi Request (Pending — Opaque 1-to-1 mapping, gpu-0 already bound)
 apiVersion: resource.k8s.io/v1
 kind: ResourceClaim
 metadata:
@@ -84,7 +84,7 @@ spec:
       path: /tmp/nvidia-mps
   restartPolicy: Never
 ---
-# Workload B: 18Gi Request (Should Succeed, filling the GPU)
+# Workload B: 18Gi Request (Pending — same 1-to-1 mapping limit)
 apiVersion: resource.k8s.io/v1
 kind: ResourceClaim
 metadata:
@@ -127,7 +127,7 @@ spec:
       path: /tmp/nvidia-mps
   restartPolicy: Never
 ---
-# Workload C: 4Gi Request (Should Pending, OOM at Scheduler level)
+# Workload C: 50Gi Request (Pending — exceeds GPU capacity regardless)
 apiVersion: resource.k8s.io/v1
 kind: ResourceClaim
 metadata:

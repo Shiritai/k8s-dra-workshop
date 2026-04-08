@@ -21,18 +21,18 @@ cleanup_stale_resources() {
     STALE_CLAIMS=$(kubectl get resourceclaims -o name 2>/dev/null | grep "gpu-" || true)
 
     if [ -n "$STALE_PODS" ] || [ -n "$STALE_CLAIMS" ]; then
-        echo "⚠️ Found stale resources. Cleaning up aggressively to ensure clean state..."
-        
-        # Delete Pods first
+        echo "⚠️ Found stale resources. Cleaning up workshop resources..."
+
+        # Delete workshop-labeled Pods
         if [ -n "$STALE_PODS" ]; then
-             kubectl delete pod --all --force --grace-period=0 2>/dev/null
-             echo "   - Deleted all pods."
+             kubectl delete $STALE_PODS --force --grace-period=0 2>/dev/null
+             echo "   - Deleted workshop pods."
         fi
-        
-        # Delete Claims
+
+        # Delete GPU-related Claims only
         if [ -n "$STALE_CLAIMS" ]; then
-             kubectl delete resourceclaims --all --force --grace-period=0 2>/dev/null
-             echo "   - Deleted all claims."
+             echo "$STALE_CLAIMS" | xargs kubectl delete --force --grace-period=0 2>/dev/null
+             echo "   - Deleted GPU claims."
         fi
         
         # Optional: Wait a bit for Kubelet GC

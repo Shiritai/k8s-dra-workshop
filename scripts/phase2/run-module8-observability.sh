@@ -8,7 +8,7 @@ MANIFEST_DIR="$PROJECT_ROOT/manifests/module8"
 # Import Phase 1 Environment Check
 source "$PROJECT_ROOT/scripts/phase1/run-module0-check-env.sh"
 
-echo "=== Module 7: Admin Access & Observability (Safe Mode) ==="
+echo "=== Module 8: Observability (DCGM Exporter) ==="
 
 # 0. Cleanup
 echo "Step 0: Cleanup..."
@@ -57,4 +57,4 @@ fi
 # Cleanup Port Forward
 kill $PF_PID
 
-echo "=== Module 7 (Observability) Passed! ==="
+echo "=== Module 8 (Observability) Passed! ==="

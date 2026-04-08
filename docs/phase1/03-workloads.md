@@ -44,12 +44,16 @@ Let's dissect `manifests/module3/demo-gpu.yaml` to understand the binding.
 
 ### 4.1. The Claim
 ```yaml
-apiVersion: resource.k8s.io/v1alpha2
+apiVersion: resource.k8s.io/v1           # 1. GA API (K8s 1.34+)
 kind: ResourceClaim
 metadata:
   name: gpu-claim-1
 spec:
-  resourceClassName: gpu.nvidia.com  # 1. Selects the Driver
+  devices:
+    requests:
+    - name: req-1                         # 2. Request name (internal reference)
+      exactly:
+        deviceClassName: gpu.nvidia.com   # 3. Selects the Driver's DeviceClass
 ```
 
 ### 4.2. The Pod
@@ -60,15 +64,16 @@ metadata:
   name: pod-gpu-1
 spec:
   containers:
-  - name: ctr
-    image: nvidia/cuda:11.7.1-base-ubuntu22.04
-    command: ["/bin/bash", "-c", "nvidia-smi && sleep 3600"]
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sleep", "inf"]
     resources:
       claims:
-      - name: claim-1              # 2. Defines a local name for the claim
+      - name: claim-ref-1              # 4. Defines a local name for the claim
   resourceClaims:
-  - name: claim-1                  # 3. Maps local name to external object
-    resourceClaimName: gpu-claim-1 # 4. References the ResourceClaim above
+  - name: claim-ref-1                  # 5. Maps local name to external object
+    resourceClaimName: gpu-claim-1     # 6. References the ResourceClaim above
+  restartPolicy: Never
 ```
 
 ## 5. Verification

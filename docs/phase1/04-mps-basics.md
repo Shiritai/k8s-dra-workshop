@@ -1,102 +1,180 @@
-# Module 4: MPS Basics (Spatial Sharing)
+# Module 4: DRA-Managed MPS Basics (Experimental)
 
 ## 1. Overview
 
-**Multi-Process Service (MPS)** is a feature of the CUDA runtime that allows multiple processes (e.g., separate Kubernetes Pods) to share the same GPU Context.
-This module verifies the infrastructure "plumbing" required to make MPS work in a containerized environment.
+Module 4 demonstrated that MPS can work in a container environment—but at the cost of the Pod having to configure `hostIPC: true`, manually mount `hostPath`, and manually set environment variables. These are security risks and maintenance burdens.
 
-### Why MPS in Kubernetes?
-By default, CUDA contexts are expensive. Time-slicing (the default sharing mode without MPS) incurs high context-switching overhead.
-MPS acts as a **Funnel**:
-- It aggregates CUDA commands from all client processes.
-- It submits them to the GPU as a single context.
-- Result: **Spatial Sharing** (Concurrent Kernel Execution) and reduced overhead.
+**The Question for Module 4**: Can we let the DRA Driver fully manage MPS, so that the Pod Spec requires no special configuration at all?
 
-## 2. Architecture: The IPC Bridge
+The answer is yes. The NVIDIA DRA GPU Driver's `MPSSupport` feature gate provides native MPS management capabilities.
 
-For a client (Pod) to "join" the MPS session, it must communicate with the MPS Control Daemon. This requires two things:
+## 2. Architecture: Driver-Managed MPS
 
-1.  **Command Channel**: A named pipe/socket at `/tmp/nvidia-mps` (Filesystem).
-2.  **Coordination Channel**: **System V IPC** (Shared Memory/Semaphores) to exchange memory pointers and signals.
-
-*Note: While many CUDA apps also need `/dev/shm` (POSIX Shared Memory) for their own internal performance (e.g., PyTorch DataLoaders), the critical bridge for MPS is the System V IPC Namespace.*
+Unlike the Host MPS in Module 4, the architecture of DRA-managed MPS is as follows:
 
 ```mermaid
 graph TD
     subgraph "Kubernetes Node"
-        MPS[MPS Control Daemon]
-        Vol1[Volume: /tmp/nvidia-mps]
-        IPC[System V IPC Namespace]
+        Driver[DRA GPU Plugin]
+        Deploy["MPS Control Daemon<br/>Deployment per Claim"]
+        CDI[CDI Spec Dynamically Generated]
     end
 
     subgraph "Workload Pod"
         App[CUDA Application]
-        Mount1[Mount: /tmp/nvidia-mps]
-        Config1[hostIPC: true]
+        Pipe["/tmp/nvidia-mps<br/>Auto-mounted"]
+        Shm["/dev/shm<br/>Independent tmpfs"]
     end
 
-    App -->|Write Command| Mount1 --> Vol1 --> MPS
-    App -->|Signal/Pointer| Config1 --> IPC --> MPS
+    Driver -->|"1. Create Deployment"| Deploy
+    Driver -->|"2. Generate CDI"| CDI
+    CDI -->|"3. Inject mount + env"| Pipe
+    CDI -->|"3. Inject shm"| Shm
+    App --> Pipe --> Deploy
+    App --> Shm --> Deploy
 ```
 
-## 3. The "In-Cluster" Challenge
+### What DRA Driver Handles Automatically
 
-In the DRA Driver, configuring a ResourceClaim with "sharing enabled" triggers the driver to essentially "unlock" the GPU.
-However, **the Pod Spec is critical here**.
-The Driver does **not** automatically mount `/dev/shm` for you (security reasons). You must explicitly configure your Pod.
+| Step | Host MPS (Module 4) | DRA-managed MPS (Module 4) |
+|------|---------------------|------------------------------|
+| MPS Daemon Startup | Manual `nvidia-cuda-mps-control -d` | Driver creates Deployment `mps-control-daemon-{id}` |
+| Compute Mode | Manual or not set | Driver automatically sets to `EXCLUSIVE_PROCESS` |
+| MPS Pipe Mount | Pod `hostPath` + `CUDA_MPS_PIPE_DIRECTORY` env | CDI automatically bind mounts + injects env |
+| IPC Channel | Pod `hostIPC: true` (Shared Node IPC namespace) | CDI mounts independent tmpfs to `/dev/shm` |
+| Daemon Lifecycle | Global/Persistent, manual management | Started/Destroyed per Claim, auto-cleaned on Claim release |
 
-### 4. Manifest Analysis (`manifests/module4/demo-mps-basics.yaml`)
+### Key Security Improvements
+
+Host MPS's `hostIPC: true` allows the Pod to access **all System V IPC resources of all processes on the Node**, which is a serious security risk in multi-tenant environments. DRA-managed MPS uses **per-claim independent `/dev/shm` tmpfs**, completely eliminating this risk.
+
+## 3. Manifest Analysis
+
+### Module 4 (Host MPS)
 
 ```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: mps-basic
 spec:
-  hostIPC: true  # <--- CRITICAL: Required to share IPC namespace with Node
+  hostIPC: true                    # Security risk
   containers:
-  - name: ctr
-    image: nvidia/cuda:11.7.1-base-ubuntu22.04
+  - env:
+    - name: CUDA_MPS_PIPE_DIRECTORY
+      value: /tmp/nvidia-mps       # Manually set
     volumeMounts:
-    - name: mps-pipe
-      mountPath: /tmp/nvidia-mps # The Command Channel
-    - name: dshm
-      mountPath: /dev/shm        # The Data Channel
+    - mountPath: /tmp/nvidia-mps
+      name: mps-pipe               # Manually mounted
   volumes:
   - name: mps-pipe
     hostPath:
-      path: /tmp/nvidia-mps
-  - name: dshm
-    emptyDir:
-      medium: Memory
+      path: /tmp/nvidia-mps        # Depends on Node path
 ```
 
-*Note: In our Kind setup, we use `hostPath` to mount the pipe that we exposed in Module 1.*
+### Module 4 (DRA-managed MPS)
+
+```yaml
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: gpu-claim-dra-mps
+spec:
+  devices:
+    config:
+    - opaque:
+        driver: gpu.nvidia.com
+        parameters:
+          apiVersion: resource.nvidia.com/v1beta1
+          kind: GpuConfig
+          sharing:
+            strategy: MPS           # Tells Driver to enable MPS
+    requests:
+    - name: gpu-req
+      exactly:
+        count: 1
+        deviceClassName: gpu.nvidia.com
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dra-mps-basic-1
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "nvidia-smi; sleep 3600"]
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: gpu-claim-dra-mps}]
+```
+
+The Pod spec is completely clean—no `hostIPC`, no `hostPath`, no manual env.
+
+### Multi-Pod Sharing
+
+Multiple Pods can share the same MPS daemon on a single GPU by referencing the same ResourceClaim:
+
+```yaml
+# Pod 1 and Pod 2 both reference the same claim
+resourceClaims: [{name: gpu, resourceClaimName: gpu-claim-dra-mps}]
+```
+
+## 4. Prerequisites
+
+1. **Kind cluster established** (Module 1) with DRA Driver installed (Module 2).
+2. **MPSSupport feature gate enabled**:
+   ```bash
+   # How to verify
+   kubectl get ds -n nvidia-system nvidia-dra-driver-gpu-kubelet-plugin -o json \
+     | grep "MPSSupport=true"
+
+   # How to enable (if not already enabled)
+   kubectl patch ds -n nvidia-system nvidia-dra-driver-gpu-kubelet-plugin \
+     --type strategic -p "$(cat manifests/module7/patch-driver-featuregate.yaml)"
+   ```
 
 ## 5. Verification
 
-This module performs a **Connectivity Check**. It does not run a heavy workload yet (that's Module 6); it just checks "dial tone".
-
-**Command:**
 ```bash
-./scripts/phase1/run-module4-mps-basics.sh
+./scripts/phase1/run-module4-dra-mps-basics.sh
 ```
 
-**What it does:**
-1.  Enters the Pod.
-2.  Runs `echo ps | nvidia-cuda-mps-control`.
-3.  If the connection is valid, the daemon replies with a list of active processes (or an empty list).
-4.  If the connection is broken, it typically hangs or returns "Connection Refused".
+### Verification Items
 
-## 6. Troubleshooting
+| Item | Expected Result | Actual Result |
+|------|-----------------|---------------|
+| 2 Pods share the same GPU | Same UUID | ✅ `GPU-d675772b-...` |
+| CDI injected `CUDA_MPS_PIPE_DIRECTORY` | `/tmp/nvidia-mps` | ✅ |
+| MPS control pipe exists | `/tmp/nvidia-mps/control` | ✅ |
+| `/dev/shm` independent tmpfs | Not Node's shm | ✅ 250G tmpfs |
+| `hostIPC` | `false` | ✅ |
 
-### "Transport endpoint is not connected"
-- **Cause**: The MPS Daemon inside the Kind Node has died or wasn't started.
-- **Fix**: Check Module 1 verification. Restart the daemon inside the node.
+## 6. Driver Source Code Analysis
 
-### "Connection Refused"
-- **Cause**: Permission issues on `/tmp/nvidia-mps` or mismatched IPC namespaces.
-- **Check**: Ensure `hostIPC: true` is set in the Pod.
+The implementation of MPS in the DRA Driver is located in `cmd/gpu-kubelet-plugin/sharing.go`:
 
-## 7. Resources
-- [NVIDIA MPS Documentation - Architecture](https://docs.nvidia.com/deploy/mps/index.html#topic_3_2)
+1. **`MpsManager`**: Manages the lifecycle of the MPS control daemon.
+2. **`MpsControlDaemon.Start()`**:
+   - Creates `pipeDir`, `shmDir`, and `logDir`.
+   - Sets the GPU compute mode to `EXCLUSIVE_PROCESS`.
+   - Mounts an independent tmpfs to `shmDir`.
+   - Creates the MPS Control Daemon **Deployment** from a template.
+3. **`GetCDIContainerEdits()`**: Generates CDI injection rules.
+   - Env var: `CUDA_MPS_PIPE_DIRECTORY=/tmp/nvidia-mps`.
+   - Mount: `pipeDir` → `/tmp/nvidia-mps`.
+   - Mount: `shmDir` → `/dev/shm`.
+
+## 7. Troubleshooting
+
+### Pod stuck in Pending
+- **Cause**: `EXCLUSIVE_PROCESS` compute mode conflict. If a process on the Node is already using the GPU (e.g., Module 4's host MPS daemon), the Driver cannot set the compute mode.
+- **Fix**: Ensure the host MPS daemon is stopped (Module 4 cleanup) and no other Pod is exclusively using the GPU.
+
+### MPS Pipe does not exist
+- **Cause**: `MPSSupport` feature gate is not enabled, and the Driver ignored the `sharing.strategy: MPS` configuration.
+- **Fix**: Confirm the feature gate is enabled (see Section 4).
+
+### Claim allocated to MIG device instead of full GPU
+- **Cause**: `deviceClassName: gpu.nvidia.com` might match a MIG device.
+- **Fix**: Use a CEL selector to exclude MIG or ensure a full GPU is available in the environment.
+
+## 8. Resources
+- [NVIDIA DRA GPU Driver - MPS Support](https://github.com/NVIDIA/k8s-dra-driver-gpu)
+- [NVIDIA MPS Documentation](https://docs.nvidia.com/deploy/mps/index.html)

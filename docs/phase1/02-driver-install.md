@@ -38,9 +38,9 @@ If you inspect the JSON output (`kubectl get resourceslices -o json`), you will 
 
 ```json
 {
-    "apiVersion": "resource.k8s.io/v1alpha2",
+    "apiVersion": "resource.k8s.io/v1",
     "kind": "ResourceSlice",
-    "metadata": { ... },
+    "metadata": { "..." : "..." },
     "spec": {
         "driver": "gpu.nvidia.com",
         "pool": {
@@ -51,19 +51,23 @@ If you inspect the JSON output (`kubectl get resourceslices -o json`), you will 
         "devices": [
             {
                 "name": "gpu-0",
-                "basic": {
-                    "attributes": {
-                        "index": 0,
-                        "model": "NVIDIA GeForce RTX 4090",
-                        "memory": "24564MB"
-                    }
+                "attributes": {
+                    "type": { "string": "gpu" },
+                    "productName": { "string": "NVIDIA A100-PCIE-40GB" },
+                    "architecture": { "string": "Ampere" },
+                    "uuid": { "string": "GPU-d675772b-..." },
+                    "cudaComputeCapability": { "version": "8.0.0" },
+                    "brand": { "string": "Nvidia" }
+                },
+                "capacity": {
+                    "memory": { "value": "40Gi" }
                 }
             }
         ]
     }
 }
 ```
-*Note: The actual attributes depend on the driver version.*
+*Note: Attributes are flat (not namespaced). Actual values depend on the driver version and GPU model.*
 
 ## 5. Troubleshooting
 

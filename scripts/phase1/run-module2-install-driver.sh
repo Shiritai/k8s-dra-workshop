@@ -86,21 +86,29 @@ echo "✅ Driver installed successfully."
 
 # 3. Verify Components
 echo "Step 3: Verifying driver components..."
+echo "Waiting for plugin pods to be ready..."
+kubectl rollout status daemonset -n "$NAMESPACE" nvidia-dra-driver-gpu-kubelet-plugin --timeout=120s
 kubectl get pods -n "$NAMESPACE"
 echo "-----------------------------------"
 kubectl get ds -n "$NAMESPACE"
 
-# 4. Check ResourceSlice
+# 4. Check ResourceSlice (wait for DRA socket registration with kubelet)
 echo "Step 4: Checking ResourceSlice creation..."
 echo "Waiting for Node Agent to publish resources..."
-sleep 5
-SLC_COUNT=$(kubectl get resourceslices --no-headers 2>/dev/null | wc -l)
-if [ "$SLC_COUNT" -gt 0 ]; then
-    echo "✅ Success: $SLC_COUNT ResourceSlice(s) found."
-    kubectl get resourceslices
-else
+for i in $(seq 1 30); do
+    SLC_COUNT=$(kubectl get resourceslices --no-headers 2>/dev/null | wc -l)
+    if [ "$SLC_COUNT" -gt 0 ]; then
+        echo "✅ Success: $SLC_COUNT ResourceSlice(s) found."
+        kubectl get resourceslices
+        break
+    fi
+    echo "  Waiting for ResourceSlice... ($i/30)"
+    sleep 3
+done
+if [ "$SLC_COUNT" -eq 0 ]; then
     echo "⚠️ Warning: No ResourceSlices found yet. Please check DaemonSet logs."
 fi
+
 
 # 5. Fix Scheduler RBAC (if needed)
 echo "Step 5: Ensuring scheduler has DRA permissions..."

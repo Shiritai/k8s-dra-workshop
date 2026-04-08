@@ -1,0 +1,53 @@
+# Module 4.5: DRA-Managed MPS Basic Workload
+# Compare with Module 4: NO hostIPC, NO hostPath, NO manual env vars.
+# The DRA driver handles MPS daemon lifecycle and CDI injection automatically.
+#
+# Pattern follows Module 10.4: inline opaque GpuConfig in ResourceClaim.
+
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: gpu-claim-dra-mps
+spec:
+  devices:
+    config:
+    - opaque:
+        driver: gpu.nvidia.com
+        parameters:
+          apiVersion: resource.nvidia.com/v1beta1
+          kind: GpuConfig
+          sharing:
+            strategy: MPS
+    requests:
+    - name: gpu-req
+      exactly:
+        count: 1
+        deviceClassName: gpu.nvidia.com
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dra-mps-basic-1
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "echo 'DRA-MPS Pod-1'; nvidia-smi; sleep 3600"]
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: gpu-claim-dra-mps}]
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dra-mps-basic-2
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "echo 'DRA-MPS Pod-2'; nvidia-smi; sleep 3600"]
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: gpu-claim-dra-mps}]
+  restartPolicy: Never

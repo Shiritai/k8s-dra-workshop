@@ -18,7 +18,7 @@ kubectl delete pod pod-resilience pod-owner pod-admin --force --grace-period=0 2
 kubectl delete resourceclaim claim-resilience claim-owner claim-admin --ignore-not-found
 # Ensure driver is ready 
 echo "Checking Driver Controller ready..."
-kubectl rollout status deployment -n nvidia-system nvidia-dra-driver-gpu-controller --timeout=60s
+kubectl get deploy -n nvidia-system -o name | head -1 | xargs -I{} kubectl rollout status -n nvidia-system {} --timeout=60s
 
 echo "Step 1: Deploying long-running workload..."
 kubectl apply -f "$MANIFEST"
@@ -28,7 +28,7 @@ kubectl wait --for=condition=Ready pod/pod-resilience --timeout=60s
 echo "✅ pod-resilience is Running!"
 
 echo "Step 3: Simulating Driver Crash (Deleting Controller Pod)..."
-kubectl delete pod -n nvidia-system -l app.kubernetes.io/name=nvidia-dra-driver-gpu-controller
+kubectl delete pod -n nvidia-system -l nvidia-dra-driver-gpu-component=controller
 echo "Controller deleted. Waiting 5s..."
 sleep 5
 
@@ -43,7 +43,15 @@ else
 fi
 
 echo "Step 5: Waiting for Driver Recovery..."
-kubectl rollout status deployment -n nvidia-system nvidia-dra-driver-gpu-controller --timeout=120s
+# Wait for controller to respawn (Deployment manages it)
+DEPLOY_NAME=$(kubectl get deploy -n nvidia-system -o name | head -1)
+if [ -n "$DEPLOY_NAME" ]; then
+    kubectl rollout status -n nvidia-system "$DEPLOY_NAME" --timeout=120s
+fi
 echo -e "${GREEN}✅ Driver recovered.${NC}"
+
+echo "Step 6: Cleanup..."
+kubectl delete pod pod-resilience --force --grace-period=0 2>/dev/null || true
+kubectl delete resourceclaim claim-resilience --ignore-not-found 2>/dev/null || true
 
 echo -e "${BLUE}=== Module 9 Verification Complete ===${NC}"

@@ -42,17 +42,17 @@ docker exec "${CLUSTER_NAME}-control-plane" bash -c "mkdir -p /etc/ld.so.conf.d 
 # due to "infoROM is corrupted", but still output valid GPU info.
 # We wrap it in a command group or use '|| true' to prevent 'set -e' from killing the script.
 NVIDIA_SMI_STATUS=0
-docker exec "${CLUSTER_NAME}-control-plane" nvidia-smi > nvidia_smi_out.tmp 2>&1 || NVIDIA_SMI_STATUS=$?
+docker exec "${CLUSTER_NAME}-control-plane" nvidia-smi > /tmp/nvidia_smi_out.tmp 2>&1 || NVIDIA_SMI_STATUS=$?
 
 if [ $NVIDIA_SMI_STATUS -eq 0 ] || [ $NVIDIA_SMI_STATUS -eq 14 ]; then
     echo "✅ Success: nvidia-smi is accessible (Status: $NVIDIA_SMI_STATUS) inside the Kind node."
-    cat nvidia_smi_out.tmp
+    cat /tmp/nvidia_smi_out.tmp
 else
     echo "❌ Fail: nvidia-smi failed inside the node with status $NVIDIA_SMI_STATUS. Check mounts."
-    cat nvidia_smi_out.tmp
+    cat /tmp/nvidia_smi_out.tmp
     exit 1
 fi
-rm nvidia_smi_out.tmp
+rm /tmp/nvidia_smi_out.tmp
 
 # 6. Start In-Cluster MPS Daemon
 echo "Step 4: Starting In-Cluster MPS Daemon..."

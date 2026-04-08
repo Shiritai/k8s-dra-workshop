@@ -1,12 +1,31 @@
+# Module 6: vLLM with DRA-Managed MPS
+# Uses GpuConfig sharing strategy (same pattern as Module 4/5).
+# NO hostPath, NO manual CUDA_MPS_* env vars.
+# The DRA driver handles MPS daemon lifecycle and CDI injection automatically.
+#
+# MPS_ACTIVE_THREAD_PERCENTAGE is controlled via GpuConfig.mpsConfig,
+# not via Pod-level env vars.
+
 apiVersion: resource.k8s.io/v1
 kind: ResourceClaim
 metadata:
   name: vllm-gpu-claim
 spec:
   devices:
+    config:
+    - opaque:
+        driver: gpu.nvidia.com
+        parameters:
+          apiVersion: resource.nvidia.com/v1beta1
+          kind: GpuConfig
+          sharing:
+            strategy: MPS
+            mpsConfig:
+              defaultActiveThreadPercentage: 100
     requests:
-    - name: req-1
+    - name: gpu-req
       exactly:
+        count: 1
         deviceClassName: gpu.nvidia.com
 ---
 apiVersion: v1
@@ -19,29 +38,23 @@ spec:
   terminationGracePeriodSeconds: 0
   containers:
   - name: vllm
-    image: vllm/vllm-gh200-openai:latest
+    # Image selection depends on GPU architecture:
+    #   A100/A30 (CC 8.0): use v0.6.6.post1 (latest dropped sm_80 precompiled kernels)
+    #   H100/H200 (CC 9.0) or L40S/RTX 4090 (CC 8.9): use :latest
+    # On ARM64 hosts (GH200), use an ARM64-compatible image.
+    # The verify script includes auto-fallback to TRITON_ATTN if needed.
+    image: vllm/vllm-openai:latest
     command: ["sleep", "inf"] # We will exec into it to run server/bench manually or via script
-    env:
-    - name: CUDA_MPS_PIPE_DIRECTORY
-      value: /tmp/nvidia-mps
-    - name: CUDA_MPS_ACTIVE_THREAD_PERCENTAGE
-      value: "100" # Default
     volumeMounts:
     - mountPath: /dev/shm
       name: dshm
-    - mountPath: /tmp/nvidia-mps
-      name: mps-pipe
     resources:
-      claims:
-      - name: claim-ref
+      claims: [{name: gpu}]
   resourceClaims:
-  - name: claim-ref
+  - name: gpu
     resourceClaimName: vllm-gpu-claim
   volumes:
   - name: dshm
     emptyDir:
       medium: Memory
-  - name: mps-pipe
-    hostPath:
-      path: /tmp/nvidia-mps
   restartPolicy: Never

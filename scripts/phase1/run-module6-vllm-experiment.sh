@@ -1,4 +1,8 @@
 #!/bin/bash
+# Module 6: vLLM Performance Analysis with DRA-Managed MPS
+# Uses GpuConfig sharing strategy (same pattern as Module 4/5).
+# MPS ActiveThreadPercentage is controlled via GpuConfig, not env vars.
+# For the legacy Host MPS approach, see run-module6-vllm-experiment.archive.sh.
 set -e
 
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
@@ -8,7 +12,7 @@ MANIFEST_DIR="$WORKSHOP_DIR/manifests"
 # Import Environment Check
 source "$SCRIPT_DIR/run-module0-check-env.sh"
 
-echo "=== Module 6.5: vLLM Performance Analysis (MPS Impact - Sensitivity Analysis) ==="
+echo "=== Module 6: vLLM Performance Analysis (DRA-Managed MPS Sensitivity) ==="
 
 MODEL_NAME="Qwen/Qwen2.5-1.5B-Instruct"
 DATASET_URL="https://huggingface.co/datasets/anon8231489123/ShareGPT_Vicuna_unfiltered/resolve/main/ShareGPT_V3_unfiltered_cleaned_split.json"
@@ -53,16 +57,16 @@ run_benchmark() {
     local mps_pct=$2
     local run_id=$3
     local label="run${run_id}_mps_${mps_pct}pct"
-    
+
     echo ">>> Running Benchmark for: $label ($mps_pct% MPS Active Thread, Run $run_id)"
-    
+
     # Download dataset inside pod if not exists
     kubectl exec "$pod_name" -- bash -c "if [ ! -f $DATASET_FILE ]; then curl -sL -o $DATASET_FILE $DATASET_URL; fi"
-    
+
     # Run vLLM Server in background
     echo "Starting vLLM Server..."
     kubectl exec "$pod_name" -- bash -c "nohup vllm serve $MODEL_NAME --port 8000 --gpu-memory-utilization 0.9 > /tmp/vllm.log 2>&1 &"
-    
+
     # Wait for server to be ready
     echo "Waiting for vLLM server to be ready..."
     for i in {1..300}; do
@@ -77,7 +81,7 @@ run_benchmark() {
         fi
         sleep 2
     done
-    
+
     # Run Benchmark
     echo "Running vllm bench serve..."
     # Capture output
@@ -88,18 +92,18 @@ run_benchmark() {
         --num-prompts 100 \
         --request-rate 4.0 \
         --port 8000 > "/tmp/result-$label.txt"
-        
+
     echo "Benchmark Complete for $mps_pct% (Run $run_id)."
-    
+
     # Parse Results
     local throughput=$(grep "Request throughput" "/tmp/result-$label.txt" | awk '{print $4}')
     local ttft=$(grep "Mean TTFT" "/tmp/result-$label.txt" | awk '{print $4}')
     local tpot=$(grep "Mean TPOT" "/tmp/result-$label.txt" | awk '{print $4}')
     local itl=$(grep "Mean ITL" "/tmp/result-$label.txt" | awk '{print $4}')
-    
+
     echo "$run_id,$mps_pct,$throughput,$ttft,$tpot,$itl" >> "$RESULT_FILE"
     echo "Recorded: Run $run_id, $mps_pct% -> Throughput: $throughput, TTFT: $ttft, TPOT: $tpot, ITL: $itl"
-    
+
     # Stop server
     kubectl exec "$pod_name" -- pkill -f "vllm serve"
 }
@@ -112,7 +116,7 @@ for run in "${RUNS[@]}"; do
     echo "########################################"
     echo "Starting Benchmark Run: $run / 3"
     echo "########################################"
-    
+
     for pct in "${PERCENTAGES[@]}"; do
         # Check if result already exists
         if grep -q "^$run,$pct," "$RESULT_FILE"; then
@@ -123,33 +127,32 @@ for run in "${RUNS[@]}"; do
         echo "========================================"
         echo "Starting Test for MPS Active Thread Percentage: $pct% (Run $run)"
         echo "========================================"
-        
-        # Cleanup
+
         # Generate unique claim name with timestamp to avoid Kubelet stuck issues on retries
         claim_name="vllm-gpu-claim-run${run}-mps${pct}-$(date +%s)"
 
         # Cleanup
         check_and_cleanup_pod "vllm-server" "$claim_name"
-        
-        # Deploy with specific MPS percentage
-        # We use sed to modify the manifest on the fly
-        # Also replace claim name to avoid Kubelet stuck issues
-        sed "s/value: \"100\"/value: \"$pct\"/" "$MANIFEST_DIR/module6/demo-vllm.yaml" | \
+
+        # Deploy with specific MPS percentage via GpuConfig
+        # Patch defaultActiveThreadPercentage in GpuConfig (not Pod env var)
+        sed "s/defaultActiveThreadPercentage: 100/defaultActiveThreadPercentage: $pct/" \
+            "$MANIFEST_DIR/module6/demo-vllm.yaml" | \
         sed "s/vllm-gpu-claim/$claim_name/g" | \
         kubectl create -f -
-        
+
         wait_for_pod_ready "vllm-server"
-        
+
         run_benchmark "vllm-server" "$pct" "$run"
-        
+
         echo "Test for $pct% (Run $run) complete."
         echo ""
-        
+
         # Cool down between tests
         echo "Cooling down for 10s..."
         sleep 10
     done
-    
+
     # Longer cool down between runs
     echo "Run $run complete. Cooling down for 30s..."
     sleep 30
