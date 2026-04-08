@@ -1,0 +1,105 @@
+# M10.2: SLA Guaranteed Multi-tenant vLLM Isolation
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stress-code
+data:
+  stress.cu: |
+    #include <cuda_runtime.h>
+    #include <iostream>
+    #include <vector>
+    #include <unistd.h>
+
+    int main(int argc, char** argv) {
+        if (argc < 2) {
+            std::cerr << "Usage: ./stress <GB>" << std::endl;
+            return 1;
+        }
+        size_t gb = std::stoull(argv[1]);
+        size_t bytes = gb * 1024ULL * 1024ULL * 1024ULL;
+        
+        void* d_ptr;
+        std::cout << "Allocating " << gb << " GB..." << std::endl;
+        cudaError_t err = cudaMalloc(&d_ptr, bytes);
+        
+        if (err != cudaSuccess) {
+            std::cerr << "❌ Allocation failed: " << cudaGetErrorString(err) << std::endl;
+            return 1;
+        }
+        
+        std::cout << "✅ Success! Holding VRAM for 60s..." << std::endl;
+        sleep(60);
+        cudaFree(d_ptr);
+        return 0;
+    }
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: vllm-high-sla-claim
+spec:
+  devices:
+    requests:
+    - name: gpu-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            expression: "device.capacity['gpu.nvidia.com'].multiprocessors.compareTo(quantity('50')) >= 0"
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: vllm-standard-claim
+spec:
+  devices:
+    requests:
+    - name: gpu-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            expression: "device.capacity['gpu.nvidia.com'].multiprocessors.compareTo(quantity('50')) < 0"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vllm-llama
+spec:
+  containers:
+  - name: vllm-container
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "echo 'High SLA (Llama) started'; nvidia-smi; sleep 3600"]
+    resources:
+      claims:
+      - name: gpu
+  resourceClaims:
+  - name: gpu
+    resourceClaimName: vllm-high-sla-claim
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vllm-gemma
+spec:
+  containers:
+  - name: vllm-container
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "mkdir -p /tmp/work && cp /src/stress.cu /tmp/work/ && cd /tmp/work && nvcc stress.cu -o stress && echo 'Standard SLA (Gemma) ready'; nvidia-smi; sleep 3600"]
+    resources:
+      claims:
+      - name: gpu
+    volumeMounts:
+    - name: src
+      mountPath: /src
+  resourceClaims:
+  - name: gpu
+    resourceClaimName: vllm-standard-claim
+  volumes:
+  - name: src
+    configMap:
+      name: stress-code
+  restartPolicy: Never

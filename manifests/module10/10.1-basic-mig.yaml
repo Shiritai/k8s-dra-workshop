@@ -1,0 +1,144 @@
+# M10.1: Basic MIG Abstraction
+# Goal: Demonstrate MIG device selection via DRA at multiple granularity levels.
+#
+# Case A: Request ANY MIG instance (no CEL filter — pure abstraction)
+# Case B: Request a specific MIG profile (7g.40gb) via CEL attribute selector
+# Case C: Request a specific MIG profile (3g.20gb)
+# Case D: Request a specific MIG profile (4g.20gb)
+
+# ============================================================
+# Case A: Any MIG Instance
+# ============================================================
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m10-1a-any-mig-claim
+spec:
+  devices:
+    requests:
+    - name: mig-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-1a-any-mig-pod
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "echo '=== Case A: Any MIG ===' && nvidia-smi -L && sleep 3600"]
+    resources:
+      claims:
+      - name: gpus
+  resourceClaims:
+  - name: gpus
+    resourceClaimName: m10-1a-any-mig-claim
+  restartPolicy: Never
+---
+# ============================================================
+# Case B: Profile Filter (7g.40gb)
+# ============================================================
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m10-1b-profile-claim
+spec:
+  devices:
+    requests:
+    - name: mig-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            expression: "device.attributes['gpu.nvidia.com'].profile == '7g.40gb'"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-1b-profile-pod
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "echo '=== Case B: Profile 7g.40gb ===' && nvidia-smi -L && sleep 3600"]
+    resources:
+      claims:
+      - name: gpus
+  resourceClaims:
+  - name: gpus
+    resourceClaimName: m10-1b-profile-claim
+  restartPolicy: Never
+---
+# ============================================================
+# Case C: Profile Filter (3g.20gb)
+# ============================================================
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m10-1c-profile-claim
+spec:
+  devices:
+    requests:
+    - name: mig-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            expression: "device.attributes['gpu.nvidia.com'].profile == '3g.20gb'"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-1c-profile-pod
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "echo '=== Case C: Profile 3g.20gb ===' && nvidia-smi -L && sleep 3600"]
+    resources:
+      claims:
+      - name: gpus
+  resourceClaims:
+  - name: gpus
+    resourceClaimName: m10-1c-profile-claim
+  restartPolicy: Never
+---
+# ============================================================
+# Case D: Profile Filter (4g.20gb)
+# ============================================================
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m10-1d-profile-claim
+spec:
+  devices:
+    requests:
+    - name: mig-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            expression: "device.attributes['gpu.nvidia.com'].profile == '4g.20gb'"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-1d-profile-pod
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "echo '=== Case D: Profile 4g.20gb ===' && nvidia-smi -L && sleep 3600"]
+    resources:
+      claims:
+      - name: gpus
+  resourceClaims:
+  - name: gpus
+    resourceClaimName: m10-1d-profile-claim
+  restartPolicy: Never

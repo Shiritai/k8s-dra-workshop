@@ -1,0 +1,106 @@
+# M10.4b: Multi-MIG x Multi-MPS Sharing
+# Goal: 2 independent MIG instances, each with its own MPS, shared by 4 Pods total.
+
+# ResourceClaim A (4g.20gb)
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m10-4b-claim-a-v1
+spec:
+  devices:
+    config:
+    - opaque:
+        driver: gpu.nvidia.com
+        parameters:
+          apiVersion: resource.nvidia.com/v1beta1
+          kind: GpuConfig
+          sharing:
+            strategy: mps
+    requests:
+    - name: mig-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            # Target 4g.20gb instance (56 SMs), exclude 7g.40gb (98 SMs)
+            expression: "device.capacity['gpu.nvidia.com'].multiprocessors.compareTo(quantity('50')) >= 0 && device.capacity['gpu.nvidia.com'].multiprocessors.compareTo(quantity('60')) < 0"
+---
+# ResourceClaim B (3g.20gb)
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m10-4b-claim-b-v1
+spec:
+  devices:
+    config:
+    - opaque:
+        driver: gpu.nvidia.com
+        parameters:
+          apiVersion: resource.nvidia.com/v1beta1
+          kind: GpuConfig
+          sharing:
+            strategy: mps
+    requests:
+    - name: mig-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            # Target 3g.20gb instance (42 SMs)
+            expression: "device.capacity['gpu.nvidia.com'].multiprocessors.compareTo(quantity('40')) >= 0 && device.capacity['gpu.nvidia.com'].multiprocessors.compareTo(quantity('50')) < 0"
+---
+# Pods for Claim A
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-4b-mps-pod-1
+spec:
+  containers:
+  - name: mps-ctr
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "echo 'Case B Pod-1...'; nvidia-smi; sleep 3600"]
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: m10-4b-claim-a-v1}]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-4b-mps-pod-2
+spec:
+  containers:
+  - name: mps-ctr
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "echo 'Case B Pod-2...'; nvidia-smi; sleep 3600"]
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: m10-4b-claim-a-v1}]
+---
+# Pods for Claim B
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-4b-mps-pod-3
+spec:
+  containers:
+  - name: mps-ctr
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "echo 'Case B Pod-3...'; nvidia-smi; sleep 3600"]
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: m10-4b-claim-b-v1}]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-4b-mps-pod-4
+spec:
+  containers:
+  - name: mps-ctr
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "echo 'Case B Pod-4...'; nvidia-smi; sleep 3600"]
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: m10-4b-claim-b-v1}]

@@ -1,0 +1,86 @@
+# Module 10.5: Silicon-to-Pod Traceability
+# Deploys 3 pods on 3 different MIG slices (7g, 4g, 3g) for traceability audit.
+
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m10-5-claim-a
+spec:
+  devices:
+    requests:
+    - name: mig-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            expression: "device.attributes['gpu.nvidia.com'].profile == '7g.40gb'"
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m10-5-claim-b
+spec:
+  devices:
+    requests:
+    - name: mig-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            expression: "device.attributes['gpu.nvidia.com'].profile == '4g.20gb'"
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m10-5-claim-c
+spec:
+  devices:
+    requests:
+    - name: mig-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            expression: "device.attributes['gpu.nvidia.com'].profile == '3g.20gb'"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-5-pod-a
+spec:
+  containers:
+  - name: ctr
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "sleep 3600"]
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: m10-5-claim-a}]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-5-pod-b
+spec:
+  containers:
+  - name: ctr
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "sleep 3600"]
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: m10-5-claim-b}]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-5-pod-c
+spec:
+  containers:
+  - name: ctr
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "sleep 3600"]
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: m10-5-claim-c}]

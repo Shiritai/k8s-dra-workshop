@@ -1,0 +1,191 @@
+# M10.2: Tight Resource Matching via CEL Selectors
+# Goal: Demonstrate precise MIG device selection using hardware capacity attributes.
+#
+# Case A: Filter by SM range 90-100 (7g.40gb has 98 SM → Running)
+# Case B: Filter by VRAM size >= 30Gi (7g.40gb qualifies → Running)
+# Case C: Filter by SM count > 100 (no A100 MIG profile qualifies → Pending)
+# Case D: Filter by SM range 50-60 (4g.20gb has 56 SM → Running)
+# Case E: Filter by VRAM 15-25Gi (3g.20gb/4g.20gb both qualify → Running)
+#
+# CEL Syntax Reference:
+#   Attributes: device.attributes['gpu.nvidia.com'].{key}     (string comparison)
+#   Capacity:   device.capacity['gpu.nvidia.com'].{key}.compareTo(quantity('...'))  (numeric)
+
+# ============================================================
+# Case A: SM Range Selection (90 <= multiprocessors < 100)
+# Expected: 7g.40gb has 98 SMs → matches → Running
+# ============================================================
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m10-2a-sm-claim
+spec:
+  devices:
+    requests:
+    - name: mig-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            expression: "device.capacity['gpu.nvidia.com'].multiprocessors.compareTo(quantity('90')) >= 0 && device.capacity['gpu.nvidia.com'].multiprocessors.compareTo(quantity('100')) < 0"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-2a-sm-pod
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "echo '=== Case A: 90 <= SM < 100 ===' && nvidia-smi -L && sleep 3600"]
+    resources:
+      claims:
+      - name: gpus
+  resourceClaims:
+  - name: gpus
+    resourceClaimName: m10-2a-sm-claim
+  restartPolicy: Never
+---
+# ============================================================
+# Case B: VRAM-based Selection (memory >= 30Gi)
+# ============================================================
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m10-2b-vram-claim
+spec:
+  devices:
+    requests:
+    - name: mig-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            expression: "device.capacity['gpu.nvidia.com'].memory.compareTo(quantity('30Gi')) >= 0"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-2b-vram-pod
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "echo '=== Case B: VRAM >= 30Gi ===' && nvidia-smi -L && sleep 3600"]
+    resources:
+      claims:
+      - name: gpus
+  resourceClaims:
+  - name: gpus
+    resourceClaimName: m10-2b-vram-claim
+  restartPolicy: Never
+---
+# ============================================================
+# Case C: SM Threshold (multiprocessors > 100)
+# Expected: No A100 MIG profile exceeds 100 SMs (max is 7g.40gb at 98) → Pending
+# ============================================================
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m10-2c-sm-range-claim
+spec:
+  devices:
+    requests:
+    - name: mig-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            expression: "device.capacity['gpu.nvidia.com'].multiprocessors.compareTo(quantity('100')) > 0"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-2c-sm-range-pod
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "echo '=== Case C: SM > 100 ===' && nvidia-smi -L && sleep 3600"]
+    resources:
+      claims:
+      - name: gpus
+  resourceClaims:
+  - name: gpus
+    resourceClaimName: m10-2c-sm-range-claim
+  restartPolicy: Never
+---
+# ============================================================
+# Case D: SM Range Selection (50 <= multiprocessors < 60)
+# Expected: 4g.20gb has 56 SMs → matches → Running
+# ============================================================
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m10-2d-sm-claim
+spec:
+  devices:
+    requests:
+    - name: mig-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            expression: "device.capacity['gpu.nvidia.com'].multiprocessors.compareTo(quantity('50')) >= 0 && device.capacity['gpu.nvidia.com'].multiprocessors.compareTo(quantity('60')) < 0"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-2d-sm-pod
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "echo '=== Case D: 50 <= SM < 60 ===' && nvidia-smi -L && sleep 3600"]
+    resources:
+      claims:
+      - name: gpus
+  resourceClaims:
+  - name: gpus
+    resourceClaimName: m10-2d-sm-claim
+  restartPolicy: Never
+---
+# ============================================================
+# Case E: VRAM Range Selection (15Gi <= memory < 25Gi)
+# Expected: 3g.20gb (20096Mi) and 4g.20gb (20096Mi) both qualify → Running
+# ============================================================
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m10-2e-vram-claim
+spec:
+  devices:
+    requests:
+    - name: mig-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            expression: "device.capacity['gpu.nvidia.com'].memory.compareTo(quantity('15Gi')) >= 0 && device.capacity['gpu.nvidia.com'].memory.compareTo(quantity('25Gi')) < 0"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-2e-vram-pod
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "echo '=== Case E: 15Gi <= VRAM < 25Gi ===' && nvidia-smi -L && sleep 3600"]
+    resources:
+      claims:
+      - name: gpus
+  resourceClaims:
+  - name: gpus
+    resourceClaimName: m10-2e-vram-claim
+  restartPolicy: Never

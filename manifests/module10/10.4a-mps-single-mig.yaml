@@ -1,0 +1,52 @@
+# M10.4a: Single-MIG x MPS Sharing
+# Goal: 2 Pods sharing 1 MIG instance (4g.20gb) via MPS.
+
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m10-4a-claim-v2
+spec:
+  devices:
+    config:
+    - opaque:
+        driver: gpu.nvidia.com
+        parameters:
+          apiVersion: resource.nvidia.com/v1beta1
+          kind: GpuConfig
+          sharing:
+            strategy: mps
+    requests:
+    - name: mig-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            # Target 4g.20gb instance (approx 20096Mi)
+            expression: "device.capacity['gpu.nvidia.com'].memory.compareTo(quantity('19Gi')) >= 0"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-4a-v1-pod-1
+spec:
+  containers:
+  - name: mps-ctr
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "echo 'Case A Pod-1...'; nvidia-smi; sleep 3600"]
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: m10-4a-claim-v2}]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m10-4a-v1-pod-2
+spec:
+  containers:
+  - name: mps-ctr
+    image: nvidia/cuda:12.3.1-base-ubuntu22.04
+    command: ["sh", "-c", "echo 'Case A Pod-2...'; nvidia-smi; sleep 3600"]
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: m10-4a-claim-v2}]
