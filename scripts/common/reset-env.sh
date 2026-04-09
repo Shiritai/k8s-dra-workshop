@@ -89,6 +89,15 @@ echo "  Restarting DRA plugin..."
 kubectl rollout restart daemonset -n "$NAMESPACE" nvidia-dra-driver-gpu-kubelet-plugin
 kubectl rollout status daemonset -n "$NAMESPACE" nvidia-dra-driver-gpu-kubelet-plugin --timeout=120s
 
+# ── Step 3.5: Ensure MPS RBAC is in place ──
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+WORKSHOP_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+RBAC_FILE="$WORKSHOP_DIR/manifests/module7/fix-driver-rbac.yaml"
+if [ -f "$RBAC_FILE" ]; then
+    echo "  Applying MPS RBAC fix..."
+    kubectl apply -f "$RBAC_FILE" 2>/dev/null || true
+fi
+
 # ── Step 4: Verify ResourceSlice ──
 echo ""
 echo "Step 4: Verifying ResourceSlice..."

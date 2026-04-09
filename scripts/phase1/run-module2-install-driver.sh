@@ -139,4 +139,38 @@ subjects:
   name: system:kube-scheduler
 EOF
 
+# 6. Fix MPS RBAC (kubelet plugin needs to manage MPS daemon deployments)
+echo "Step 6: Ensuring kubelet plugin has MPS daemon permissions..."
+RBAC_FILE="$WORKSHOP_DIR/manifests/module7/fix-driver-rbac.yaml"
+if [ -f "$RBAC_FILE" ]; then
+    kubectl apply -f "$RBAC_FILE"
+else
+    # Inline fallback if file not found
+    cat <<RBAC_EOF | kubectl apply -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: nvidia-dra-driver-kubelet-plugin-deployments-role
+  namespace: nvidia-system
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nvidia-dra-driver-kubelet-plugin-deployments-binding
+  namespace: nvidia-system
+subjects:
+- kind: ServiceAccount
+  name: nvidia-dra-driver-nvidia-dra-driver-gpu-service-account-kubeletplugin
+  namespace: nvidia-system
+roleRef:
+  kind: Role
+  name: nvidia-dra-driver-kubelet-plugin-deployments-role
+  apiGroup: rbac.authorization.k8s.io
+RBAC_EOF
+fi
+
 echo "=== Driver Installation Complete! ==="
