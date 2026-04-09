@@ -92,7 +92,7 @@ if [ "$HAS_MIG" -gt 0 ]; then
     # See: docs/book/appendix-02-troubleshooting.md "問題 2"
     echo "Refreshing kubelet + DRA plugin registration..."
     CTRL_NODE="workshop-dra-control-plane"
-    docker exec "$CTRL_NODE" pkill -f kubelet
+    docker exec "$CTRL_NODE" pkill -x kubelet
     echo "  Waiting for kubelet to restart..."
     sleep 20
     until kubectl get nodes &>/dev/null; do sleep 5; done

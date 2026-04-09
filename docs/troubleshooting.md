@@ -18,7 +18,7 @@ Kubelet communicates with the DRA plugin via a Unix socket, relying on `fsnotify
 **Solution**—Must be in order, kubelet first, then plugin:
 ```bash
 # 1. Restart kubelet (it will automatically respawn after being killed in Kind)
-docker exec workshop-dra-control-plane pkill -f kubelet
+docker exec workshop-dra-control-plane pkill -x kubelet
 
 # 2. Wait for API server to recover
 sleep 20

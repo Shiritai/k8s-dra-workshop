@@ -48,7 +48,7 @@ refresh_dra_driver() {
 
     # Restart kubelet to clear stale DRA plugin registration
     echo "  Restarting kubelet..."
-    docker exec "$CLUSTER_NAME-control-plane" pkill -f kubelet 2>/dev/null || true
+    docker exec "$CLUSTER_NAME-control-plane" pkill -x kubelet 2>/dev/null || true
     sleep 15
 
     # Wait for API server
