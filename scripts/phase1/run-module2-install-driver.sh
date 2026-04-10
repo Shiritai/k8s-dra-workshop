@@ -37,14 +37,13 @@ for dev in /dev/nvidia*; do
     fi
 done
 
-# We mount the host's library directory directly to the container's standard path.
-# We also set LD_LIBRARY_PATH to that path inside the container to ensure
-# dynamic loading (dlopen) works correctly without requiring ldconfig.
+# Kind doesn't have the NVIDIA container runtime, so driver libs aren't
+# auto-injected into containers. We set COPY_DRIVER_LIBS_FROM_ROOT=true to have
+# the plugin containers copy libs from /driver-root at startup.
 cat > "$ARCH_VALUES" <<EOF
-nvidiaDriverLibDir: "/usr/lib/$LIB_DIR"
 nvidiaDevices: $(echo -e "$DEVICES_YAML")
 kubeletPlugin:
-  skipPrestart: $([ "$ARCH" = "aarch64" ] && echo "true" || echo "false")
+  skipPrestart: true
   containers:
     init:
       env:
@@ -54,10 +53,14 @@ kubeletPlugin:
       env:
       - name: LD_LIBRARY_PATH
         value: "/usr/lib/$LIB_DIR"
+      - name: COPY_DRIVER_LIBS_FROM_ROOT
+        value: "true"
     gpus:
       env:
       - name: LD_LIBRARY_PATH
         value: "/usr/lib/$LIB_DIR"
+      - name: COPY_DRIVER_LIBS_FROM_ROOT
+        value: "true"
 controller:
   containers:
     computeDomain:

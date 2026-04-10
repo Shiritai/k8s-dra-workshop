@@ -109,6 +109,22 @@ spec:
             sed -i 's/^ModifyDeviceFiles: 1$/ModifyDeviceFiles: 0/' root/gpu-params
             mount --bind root/gpu-params /proc/driver/nvidia/params
           fi
+          # For Kind environments: copy driver libs from /driver-root if needed
+          if [ "${COPY_DRIVER_LIBS_FROM_ROOT}" = "true" ]; then
+            ARCH_LIB=""
+            for d in x86_64-linux-gnu aarch64-linux-gnu; do
+              if [ -f "/driver-root/usr/lib/$d/libnvidia-ml.so.1" ]; then
+                ARCH_LIB="$d"; break
+              fi
+            done
+            if [ -n "$ARCH_LIB" ]; then
+              for f in libnvidia-ml libcuda libnvidia-ptxjitcompiler; do
+                cp -n /driver-root/usr/lib/$ARCH_LIB/${f}.so.* /usr/lib/$ARCH_LIB/ 2>/dev/null || true
+              done
+              cp -n /driver-root/usr/bin/nvidia-smi /usr/bin/ 2>/dev/null || true
+              export DRIVER_ROOT_CTR_PATH=/
+            fi
+          fi
           compute-domain-kubelet-plugin -v $(LOG_VERBOSITY)
         resources:
           {{- toYaml .Values.kubeletPlugin.containers.computeDomains.resources | nindent 10 }}
@@ -221,6 +237,25 @@ spec:
             cp /proc/driver/nvidia/params root/gpu-params
             sed -i 's/^ModifyDeviceFiles: 1$/ModifyDeviceFiles: 0/' root/gpu-params
             mount --bind root/gpu-params /proc/driver/nvidia/params
+          fi
+          # For Kind environments: if nvidia libs are not in the container's
+          # standard lib path, copy them from /driver-root. This is needed
+          # because Kind doesn't have the NVIDIA container runtime to inject
+          # driver libraries automatically.
+          if [ "${COPY_DRIVER_LIBS_FROM_ROOT}" = "true" ]; then
+            ARCH_LIB=""
+            for d in x86_64-linux-gnu aarch64-linux-gnu; do
+              if [ -f "/driver-root/usr/lib/$d/libnvidia-ml.so.1" ]; then
+                ARCH_LIB="$d"; break
+              fi
+            done
+            if [ -n "$ARCH_LIB" ]; then
+              for f in libnvidia-ml libcuda libnvidia-ptxjitcompiler; do
+                cp -n /driver-root/usr/lib/$ARCH_LIB/${f}.so.* /usr/lib/$ARCH_LIB/ 2>/dev/null || true
+              done
+              cp -n /driver-root/usr/bin/nvidia-smi /usr/bin/ 2>/dev/null || true
+              export DRIVER_ROOT_CTR_PATH=/
+            fi
           fi
           gpu-kubelet-plugin -v $(LOG_VERBOSITY)
         resources:
