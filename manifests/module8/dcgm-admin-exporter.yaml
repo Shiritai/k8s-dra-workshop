@@ -1,0 +1,48 @@
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: claim-dcgm-monitor
+  namespace: nvidia-system
+spec:
+  devices:
+    requests:
+    - name: monitor-gpu
+      exactly:
+        deviceClassName: gpu-admin.nvidia.com
+        adminAccess: true
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dcgm-exporter
+  namespace: nvidia-system
+  labels:
+    app: dcgm-exporter
+spec:
+  containers:
+  - name: exporter
+    image: nvidia/dcgm-exporter:3.3.5-3.4.0-ubuntu22.04
+    env:
+    - name: DCGM_EXPORTER_KUBERNETES
+      value: "true"
+    - name: DCGM_EXPORTER_LISTEN
+      value: ":9400"
+    securityContext:
+      capabilities:
+        add: ["SYS_ADMIN"]
+    ports:
+    - name: metrics
+      containerPort: 9400
+    resources:
+      claims:
+      - name: gpu-access
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+  resourceClaims:
+  - name: gpu-access
+    resourceClaimName: claim-dcgm-monitor
+  restartPolicy: Always

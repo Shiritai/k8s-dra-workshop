@@ -1,109 +1,149 @@
-# k8s x NVIDIA DRA (Structured Parameters) on Kind Workshop
+# Kubernetes x NVIDIA DRA Workshop
 
-歡迎來到 k8s x NVIDIA DRA 工作坊！
+A hands-on workshop for Kubernetes engineers to explore **Dynamic Resource Allocation (DRA)** with NVIDIA GPUs on Kind clusters.
 
-本工作坊旨在協助 Kubernetes 工程師與開發者，在本地 Kind 環境中快速體驗並驗證 **Dynamic Resource Allocation (DRA)** 的 ResourceSlice 與 Structured Parameters 等機制。
+Covers the full stack: exclusive GPU scheduling, MPS sharing, MIG hardware isolation, MIG x MPS hybrid architecture, admin access, observability, and resilience testing.
 
-## Phase 1: Basic Setup & MPS Integration
-Phase 1 focuses on establishing a functional DRA environment with **MPS (Spatial Sharing)** support.
+> **[繁體中文版 README](README-zh_TW.md)**
 
-| Module | Topic                                              | Description                                 |
-| :----- | :------------------------------------------------- | :------------------------------------------ |
-| **00** | [Prerequisites](docs/phase1/00-prerequisites.md)   | Check Host Driver, Docker, and CDI config.  |
-| **01** | [Kind Setup](docs/phase1/01-kind-setup.md)         | Build Kind with **In-Cluster MPS** support. |
-| **02** | [Driver Install](docs/phase1/02-driver-install.md) | Deploy NVIDIA DRA Driver & Node Agent.      |
-| **03** | [Workloads](docs/phase1/03-workloads.md)           | Verify basic exclusive GPU scheduling.      |
-| **04** | [MPS Basics](docs/phase1/04-mps-basics.md)         | Enable Spatial Sharing (IPC Connectivity).  |
-| **05** | [MPS Advanced](docs/phase1/05-mps-advanced.md)     | Verify Resource Limits (Thread % & Memory). |
-| **06** | [vLLM Verification](docs/phase1/06-vllm-mps.md)    | Verify vLLM with MPS (Basic Check).         |
-| **06.5** | [vLLM Experiment](docs/phase1/06-vllm-experiment.md) | Sensitivity Analysis (MPS Impact).          |
+## Prerequisites
 
-### Phase 2: Advanced Resource Management (Modules 7-9)
+| Tool | Purpose | Verify |
+|------|---------|--------|
+| NVIDIA Driver 550+ | GPU driver | `nvidia-smi` |
+| Docker | Container runtime | `docker ps` |
+| Kind v0.24+ | Local K8s cluster | `kind version` |
+| Helm 3 | DRA driver install | `helm version` |
+| nvidia-ctk | CDI config | `nvidia-ctk cdi list` |
 
-| # | Module Name | Manifests | Scripts | Docs |
-| :--- | :--- | :--- | :--- | :--- |
-| 07 | Consumable Capacity | `demo-shared-capacity.yaml` | `run-module7-consumable-capacity.sh` | [Link](docs/phase2/07-consumable-capacity.md) |
-| 08 | Admin Access        | `demo-admin-access.yaml`    | `run-module8-admin-access.sh`        | [Link](docs/phase2/08-admin-access.md)        |
-| 09 | Resilience          | `demo-resilience.yaml`      | `run-module9-resilience.sh`          | [Link](docs/phase2/09-resilience.md)          |
+```bash
+./scripts/phase1/run-module0-check-env.sh   # Automated check
+```
 
-## Module Dependencies
+## Workshop Modules
+
+### Phase 1: DRA Basics & MPS Sharing
+
+| Module | Topic | Script | Docs |
+|--------|-------|--------|------|
+| M0 | Prerequisites Check | `run-module0-check-env.sh` | [Link](docs/phase1/00-prerequisites.md) |
+| M1 | Kind Cluster Setup | `run-module1-setup-kind.sh` | [Link](docs/phase1/01-kind-setup.md) |
+| M2 | DRA Driver Install | `run-module2-install-driver.sh` | [Link](docs/phase1/02-driver-install.md) |
+| M3 | First GPU Pod | `run-module3-verify-workload.sh` | [Link](docs/phase1/03-workloads.md) |
+| M4 | MPS Basics (DRA-managed) | `run-module4-mps-basics.sh` | [Link](docs/phase1/04-mps-basics.md) |
+| M5 | MPS Resource Limits | `run-module5-mps-advanced.sh` | [Link](docs/phase1/05-mps-advanced.md) |
+| M6 | vLLM on MPS | `run-module6-vllm-verify.sh` | [Link](docs/phase1/06-vllm-mps.md) |
+
+### Phase 2: Production Readiness
+
+| Module | Topic | Script | Docs |
+|--------|-------|--------|------|
+| M7 | Consumable Capacity (Alpha) | `run-module7-consumable-capacity.sh` | [Link](docs/phase2/07-consumable-capacity.md) |
+| M8 | Admin Access (Beta) | `run-module8-admin-access.sh` | [Link](docs/phase2/08-admin-access.md) |
+| M8 | Observability (DCGM via adminAccess) | `run-module8-observability.sh` | [Link](docs/phase2/08-admin-access.md) |
+| M9 | Resilience (Chaos) | `run-module9-resilience.sh` | [Link](docs/phase2/09-resilience.md) |
+
+### Phase 3: MIG Hardware Isolation (A100/H100 only)
+
+| Module | Topic | Script | Docs |
+|--------|-------|--------|------|
+| M10.1 | MIG Profile Selection | `module10-1/run.sh` | [Link](docs/phase3/10.1-mig-dra-abstraction.md) |
+| M10.2 | CEL Capacity Matching | `module10-2/run.sh` | [Link](docs/phase3/10.2-auto-resource-matching.md) |
+| M10.3 | OOM Isolation Proof | `module10-3/run.sh` | [Link](docs/phase3/10.3-mig-isolation-experiment.md) |
+| M10.4 | MIG x MPS Hybrid | `module10-4/run.sh` | [Link](docs/phase3/10.4-mig-x-mps.md) |
+| M10.5 | Silicon-to-Pod Traceability | `module10-5/run.sh` | [Link](docs/phase3/10.5-mig-x-observability.md) |
+| M10.6 | Dynamic MIG Reconfiguration | `module10-6/run.sh` | [Link](docs/phase3/10.6-dynamic-reconfig.md) |
+
+## Quick Start
+
+```bash
+# Setup (run once)
+./scripts/phase1/run-module0-check-env.sh
+./scripts/phase1/run-module1-setup-kind.sh
+./scripts/phase1/run-module2-install-driver.sh
+
+# Run any module independently (M3-M9)
+./scripts/phase1/run-module3-verify-workload.sh
+./scripts/phase2/run-module8-admin-access.sh    # order doesn't matter
+
+# Run everything
+./run_all.sh
+
+# MIG mode (A100/H100 only)
+sudo ./scripts/common/mig-reconfig.sh mig       # enable MIG
+./scripts/phase3/module10-1/run.sh               # run MIG modules
+sudo ./scripts/common/mig-reconfig.sh gpu        # restore full GPU mode
+```
+
+## Module Independence
+
+After initial setup (M0 → M1 → M2), **every module (M3-M9) is self-contained** and can be run in any order. Each module sources a shared [`ensure-ready.sh`](scripts/common/ensure-ready.sh) helper that:
+
+- Verifies driver pods are running
+- Enables the MPSSupport feature gate if needed
+- Cleans stale DeviceClasses, pods, claims, and MPS daemons from prior modules
+- Waits for ResourceSlice availability
+
+## Module Dependency Graph
 
 ```mermaid
 graph TD
-    %% Nodes
-    M0[Module 0: Check Env]
-    M1[Module 1: Setup Kind]
-    M2[Module 2: Install Driver]
-    M3[Module 3: Workload]
-    M4[Module 4: MPS Basics]
-    M5[Module 5: MPS Advanced]
-    M6[Module 6: vLLM Verify]
-    M6.5[Module 6.5: vLLM Exp]
+    M0[M0: Check Env] --> M1[M1: Kind Cluster]
+    M1 --> M2[M2: DRA Driver]
+    M2 --> M3[M3: First Pod]
+    M2 --> M4[M4: MPS Basics]
+    M2 --> M5[M5: MPS Limits]
+    M2 --> M6[M6: vLLM]
+    M2 --> M7[M7: Capacity]
+    M2 --> M8[M8: Admin + DCGM]
+    M2 --> M9[M9: Resilience]
+    M2 --> MIG{MIG enabled?}
+    MIG --> M10.1[M10.1: MIG Selection]
+    MIG --> M10.2[M10.2: CEL Matching]
+    MIG --> M10.3[M10.3: OOM Isolation]
+    MIG --> M10.4[M10.4: MIG x MPS]
+    MIG --> M10.5[M10.5: Traceability]
+    MIG --> M10.6[M10.6: Reconfig]
 
-    %% Dependencies
-    M0 --> M1
-    M1 --> M2
-    M2 --> M3
-    M2 --> M4
-    M4 --> M5
-    M5 --> M6
-    M6 --> M6.5
-
-    %% Styling
-    classDef infra fill:#f9f,stroke:#333,stroke-width:2px;
-    classDef workload fill:#bbf,stroke:#333,stroke-width:2px;
-    class M0,M1,M2 infra;
-    class M3,M4,M5,M6,M6.5 workload;
+    classDef infra fill:#f9f,stroke:#333,stroke-width:2px
+    classDef workload fill:#bbf,stroke:#333,stroke-width:2px
+    classDef mig fill:#fdb,stroke:#333,stroke-width:2px
+    class M0,M1,M2 infra
+    class M3,M4,M5,M6,M7,M8,M9 workload
+    class M10.1,M10.2,M10.3,M10.4,M10.5,M10.6 mig
 ```
 
-## Quick Start
+## Test Environment
+
+| | Config |
+|---|---|
+| **GPU** | NVIDIA A100-PCIE-40GB (MIG), RTX 5090 (MPS/vLLM) |
+| **OS** | Ubuntu 22.04 LTS, Kernel 5.15+ |
+| **Driver** | NVIDIA Driver 550+ |
+| **K8s** | Kind v0.24+ (K8s v1.32–1.34) with DRA feature gates |
+| **DRA Driver** | `nvcr.io/nvidia/k8s-dra-driver-gpu:v25.8.1` |
+
+## Key Technical Highlights
+
+- **DRA-managed MPS**: GPU sharing without `hostIPC` — the driver creates per-claim MPS daemons automatically
+- **Kind compatibility**: `COPY_DRIVER_LIBS_FROM_ROOT` mechanism solves NVML library discovery on Kind clusters without NVIDIA container runtime
+- **Hardware isolation**: MIG partitioning provides independent memory controllers and SMs per slice
+- **MIG x MPS hybrid**: Hardware isolation between slices + software sharing within each slice
+- **Resilience by design**: CDI decoupling means driver/controller restarts don't kill running workloads
+- **Admin Access**: `adminAccess: true` bypasses GPU exclusivity for debugging fully-allocated nodes
+
+## Troubleshooting
+
+If any module fails unexpectedly, run `reset-env` first:
+
 ```bash
-# 1. Check Environment
-./scripts/phase1/run-module0-check-env.sh
-
-# 2. Setup Cluster
-./scripts/phase1/run-module1-setup-kind.sh
-
-# 3. Install Driver
-./scripts/phase1/run-module2-install-driver.sh
-
-# 4. Run All Verifications
-./scripts/phase1/run-module3-verify-workload.sh
-./scripts/phase1/run-module4-mps-basics.sh
-./scripts/phase1/run-module5-mps-advanced.sh
-./scripts/phase1/run-module6-vllm-verify.sh
-
-# 5. Run Phase 2 (Advanced Features)
-# Note: These scripts include auto-cleanup to ensure idempotency.
-./scripts/phase2/run-module7-consumable-capacity.sh
-./scripts/phase2/run-module8-admin-access.sh
-./scripts/phase2/run-module9-resilience.sh
+./scripts/common/reset-env.sh       # clean all resources + refresh DRA plugin (keeps cluster)
 ```
 
-## Phase 1 Verification Results (Empirical)
-We verified the MPS implementation with rigorous benchmarks using the following **Test Environment**:
-- **Hardware**: NVIDIA GeForce RTX 4090 (24GB)
-- **Host**: Ubuntu 22.04 LTS, Kernel 5.15+
-- **Driver**: NVIDIA Driver 550+
-- **Kubernetes**: Kind v0.24.0 (K8s v1.32.0) with DRA Feature Gates enabled
-
-**Key Findings:**
-- **Extreme Throttling (1% Limit)**: Throughput dropped from **5.29 TFLOPS** (100%) to **0.078 TFLOPS** (1%), confirming ~68x hardware-level throttling.
-- **Fair Competition**: Three pods (each 20%) achieved identical throughput (~0.86 TFLOPS each) under heavy contention.
-- **Memory Hard Limit**: Applications exceeding `CUDA_MPS_PINNED_DEVICE_MEM_LIMIT` are immediately terminated with OOM.
-
-
-## Technical Highlights
-- **In-Cluster MPS Architecture**: Runs the MPS control daemon *inside* the Kind node to resolve IPC namespace isolation issues.
-- **Dynamic Library Discovery**: Automatically finds and mounts Host NVIDIA libraries (including `libnvidia-ptxjitcompiler`) into the Kind node.
-- **Latest DRA API**: Supports Kubernetes `resource.k8s.io/v1` (Stable/Beta) APIs.
-- **Resilience**: Driver components are decoupled from workload execution (Module 9).
-- **Admin Bypass**: Native support for administrator access even on fully loaded nodes (Module 8).
+This resolves most issues (stale claims, expired plugin sockets, leftover DeviceClasses). See the full [Troubleshooting Guide](docs/troubleshooting.md) for details.
 
 ## Cleanup
-```bash
-./scripts/common/run-teardown.sh
-```
 
-> [!TIP]
-> Encountering issues? Check the [Troubleshooting Guide](docs/troubleshooting.md).
+```bash
+./scripts/common/run-teardown.sh    # destroy Kind cluster
+```

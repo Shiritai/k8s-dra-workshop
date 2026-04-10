@@ -195,10 +195,25 @@ sudo apt install nvidia-container-toolkit
 
 ---
 
+## Quick Fix: Reset Environment
+
+If any module fails unexpectedly, run `reset-env` first before investigating further:
+
+```bash
+./scripts/common/reset-env.sh
+```
+
+This cleans all workshop pods, claims, DeviceClasses, refreshes the kubelet + DRA plugin socket, and verifies ResourceSlice availability — without destroying the cluster or reinstalling the driver.
+
+After reset, any module (M3–M9) can be re-run independently.
+
+---
+
 ## Quick Diagnosis Flow
 
 ```
 Pod Stuck?
+  ├── First try: ./scripts/common/reset-env.sh
   ├── ContainerCreating → Issue 1 (Expired plugin socket)
   ├── Pending + "cannot allocate all claims"
   │     ├── Are there devices in ResourceSlice? → kubectl get resourceslices
