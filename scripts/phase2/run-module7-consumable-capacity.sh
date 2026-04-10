@@ -6,52 +6,7 @@ MANIFEST_WORKLOAD="$WORKSHOP_DIR/manifests/module7/demo-capacity-workload.yaml"
 CLASS_FILE="$WORKSHOP_DIR/manifests/module7/gpu-class-capacity.yaml"
 
 echo "=== Module 7: Verifying Consumable Capacity (Shared Pool) ==="
-source "$SCRIPT_DIR/check-env.sh"
-
-echo "Step 0: Cleanup..."
-# Force delete to avoid sticky resources
-kubectl delete pod pod-small pod-4gi pod-18gi pod-overflow --force --grace-period=0 2>/dev/null || true
-kubectl delete resourceclaim claim-small claim-4gi claim-18gi claim-overflow --ignore-not-found
-kubectl delete -f "$CLASS_FILE" --ignore-not-found 2>/dev/null || true
-
-
-echo "Step 0.4: Patching Driver (Feature Gates: MPS)..."
-# Enable MPS Feature Gate (Disabled by default in v25.8.1)
-if [ -f "$WORKSHOP_DIR/manifests/module7/patch-driver-featuregate.yaml" ]; then
-    kubectl patch daemonset nvidia-dra-driver-gpu-kubelet-plugin \
-        -n nvidia-system \
-        --patch-file "$WORKSHOP_DIR/manifests/module7/patch-driver-featuregate.yaml"
-    echo "✅ Applied FeatureGate Patch (MPS=true)."
-else
-     echo "⚠️ Warning: patch-driver-featuregate.yaml not found. MPS might fail."
-fi
-
-echo "Step 0.5: Refreshing Driver State (Apply Patches)..."
-# Restart Plugin via Rollout to apply patches and clear state
-kubectl rollout restart daemonset -n nvidia-system nvidia-dra-driver-gpu-kubelet-plugin
-kubectl rollout status daemonset -n nvidia-system nvidia-dra-driver-gpu-kubelet-plugin --timeout=120s
-echo "Driver Plugin refreshed."
-
-echo "Step 0.55: Applying RBAC Fix (Supplemental)..."
-# Fixes 'Permission Denied' for deployments (MPS control daemon)
-if [ -f "$WORKSHOP_DIR/manifests/module7/fix-driver-rbac.yaml" ]; then
-    kubectl apply -f "$WORKSHOP_DIR/manifests/module7/fix-driver-rbac.yaml"
-    echo "✅ RBAC Fix applied."
-else
-    echo "⚠️ Warning: fix-driver-rbac.yaml not found. Verification might fail."
-fi
-
-echo "Step 0.6: Waiting for ResourceSlice..."
-# Wait for ResourceSlice to be published by the new driver instance
-for i in {1..30}; do
-    count=$(kubectl get resourceslice -o name | wc -l)
-    if [ "$count" -gt 0 ]; then
-        echo "✅ ResourceSlice found."
-        break
-    fi
-    echo "Waiting for ResourceSlice (Current: $count)..."
-    sleep 2
-done
+source "$WORKSHOP_DIR/scripts/common/ensure-ready.sh"
 
 echo "Step 1: Applying Shared DeviceClass (MPS Strategy)..."
 # Using MPS strategy manifest (ensure it exists)

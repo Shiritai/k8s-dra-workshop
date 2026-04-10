@@ -12,11 +12,7 @@ WORKSHOP_DIR="$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")"
 MANIFEST="$WORKSHOP_DIR/manifests/module10/10.5-traceability.yaml"
 
 echo "=== Module 10.5: MIG Observability (Silicon-to-Pod Traceability) ==="
-
-# Cleanup
-echo "Step 1: Cleaning up previous resources..."
-kubectl delete -f "$MANIFEST" --ignore-not-found --wait=false 2>/dev/null || true
-sleep 2
+source "$WORKSHOP_DIR/scripts/common/ensure-ready.sh"
 
 # Deploy 3 pods, one per MIG slice
 echo "Step 2: Deploying workloads on all MIG slices..."

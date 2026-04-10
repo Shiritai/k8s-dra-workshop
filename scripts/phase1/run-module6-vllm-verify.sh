@@ -9,10 +9,8 @@ SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 WORKSHOP_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 MANIFEST_DIR="$WORKSHOP_DIR/manifests"
 
-# Import Environment Check
-source "$SCRIPT_DIR/run-module0-check-env.sh"
-
 echo "=== Module 6: vLLM Verification (DRA-Managed MPS) ==="
+source "$WORKSHOP_DIR/scripts/common/ensure-ready.sh"
 
 MODEL_NAME="Qwen/Qwen2.5-1.5B-Instruct"
 MPS_PCT=50

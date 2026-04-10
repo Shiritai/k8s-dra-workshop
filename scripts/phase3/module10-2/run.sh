@@ -17,6 +17,7 @@ WORKSHOP_DIR="$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")"
 MANIFEST="$WORKSHOP_DIR/manifests/module10/10.2-tight-matching.yaml"
 
 echo "=== NVIDIA DRA Workshop: Module 10.2 — Tight Resource Matching ==="
+source "$WORKSHOP_DIR/scripts/common/ensure-ready.sh"
 
 # Cleanup
 echo "Step 1: Cleaning up previous resources..."

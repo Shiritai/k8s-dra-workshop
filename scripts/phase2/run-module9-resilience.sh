@@ -10,15 +10,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}=== Module 9: Verifying Resilience (Self-Healing) ===${NC}"
-source "$SCRIPT_DIR/check-env.sh"
-
-echo "Step 0: Cleanup..."
-# Force delete potential leftovers to ensure Idempotency
-kubectl delete pod pod-resilience pod-owner pod-admin --force --grace-period=0 2>/dev/null || true
-kubectl delete resourceclaim claim-resilience claim-owner claim-admin --ignore-not-found
-# Ensure driver is ready 
-echo "Checking Driver Controller ready..."
-kubectl get deploy -n nvidia-system -o name | head -1 | xargs -I{} kubectl rollout status -n nvidia-system {} --timeout=60s
+source "$WORKSHOP_DIR/scripts/common/ensure-ready.sh"
 
 echo "Step 1: Deploying long-running workload..."
 kubectl apply -f "$MANIFEST"

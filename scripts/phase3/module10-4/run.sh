@@ -17,6 +17,7 @@ MANIFEST_A="$WORKSHOP_DIR/manifests/module10/10.4a-mps-single-mig.yaml"
 MANIFEST_B="$WORKSHOP_DIR/manifests/module10/10.4b-mps-multi-mig.yaml"
 
 echo "=== Module 10.4: MIG x MPS Hybrid Configuration ==="
+source "$WORKSHOP_DIR/scripts/common/ensure-ready.sh"
 
 # Cleanup
 echo "Step 1: Cleaning up previous resources..."

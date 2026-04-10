@@ -28,7 +28,7 @@ spec:
         - name: DCGM_EXPORTER_LISTEN
           value: ":9400"
         - name: LD_LIBRARY_PATH
-          value: "/usr/lib/x86_64-linux-gnu"
+          value: "/usr/lib/LIB_ARCH_PLACEHOLDER"
         - name: NVIDIA_VISIBLE_DEVICES
           value: "all"
         - name: NVIDIA_DRIVER_CAPABILITIES
@@ -52,20 +52,20 @@ spec:
           mountPath: /var/lib/kubelet/pod-resources
           readOnly: true
         - name: libnvidia-ml-1
-          mountPath: /usr/lib/x86_64-linux-gnu/libnvidia-ml.so
+          mountPath: /usr/lib/LIB_ARCH_PLACEHOLDER/libnvidia-ml.so
         - name: libnvidia-ml-1
-          mountPath: /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1
+          mountPath: /usr/lib/LIB_ARCH_PLACEHOLDER/libnvidia-ml.so.1
         - name: libcuda-1
-          mountPath: /usr/lib/x86_64-linux-gnu/libcuda.so
+          mountPath: /usr/lib/LIB_ARCH_PLACEHOLDER/libcuda.so
         - name: libcuda-1
-          mountPath: /usr/lib/x86_64-linux-gnu/libcuda.so.1
+          mountPath: /usr/lib/LIB_ARCH_PLACEHOLDER/libcuda.so.1
       volumes:
       - name: pod-resources
         hostPath:
           path: /var/lib/kubelet/pod-resources
       - name: libnvidia-ml-1
         hostPath:
-          path: /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1
+          path: /usr/lib/LIB_ARCH_PLACEHOLDER/libnvidia-ml.so.1
       - name: libcuda-1
         hostPath:
-          path: /usr/lib/x86_64-linux-gnu/libcuda.so.1
+          path: /usr/lib/LIB_ARCH_PLACEHOLDER/libcuda.so.1

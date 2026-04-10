@@ -10,22 +10,7 @@ MANIFEST_A="$WORKSHOP_DIR/manifests/module5/demo-dra-mps-limits.yaml"
 MANIFEST_B="$WORKSHOP_DIR/manifests/module5/demo-dra-mps-shared.yaml"
 
 echo "=== Module 5: DRA-Managed MPS Advanced (Experimental) ==="
-source "$SCRIPT_DIR/run-module0-check-env.sh"
-
-# Cleanup
-echo "Step 0: Cleaning up previous resources..."
-kubectl delete -f "$MANIFEST_B" --ignore-not-found --wait=true 2>/dev/null || true
-kubectl delete -f "$MANIFEST_A" --ignore-not-found --wait=true 2>/dev/null || true
-sleep 2
-
-echo "Step 1: Verifying MPSSupport feature gate..."
-if kubectl get ds -n nvidia-system nvidia-dra-driver-gpu-kubelet-plugin -o json 2>/dev/null \
-   | grep -q "MPSSupport=true"; then
-    echo "  MPSSupport=true confirmed."
-else
-    echo "  ❌ MPSSupport not enabled. Run Module 4.5 first."
-    exit 1
-fi
+source "$WORKSHOP_DIR/scripts/common/ensure-ready.sh"
 
 # ─── Part A: Single Pod with MPS Limits ───
 echo ""

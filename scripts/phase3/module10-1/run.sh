@@ -15,9 +15,7 @@ WORKSHOP_DIR="$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")"
 MANIFEST="$WORKSHOP_DIR/manifests/module10/10.1-basic-mig.yaml"
 
 echo "=== NVIDIA DRA Workshop: Module 10.1 — MIG Abstraction ==="
-
-# Cleanup
-echo "Step 1: Cleaning up previous resources..."
+source "$WORKSHOP_DIR/scripts/common/ensure-ready.sh"
 kubectl delete -f "$MANIFEST" --ignore-not-found --wait=true 2>/dev/null || true
 sleep 2
 
