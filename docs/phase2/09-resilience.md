@@ -18,7 +18,10 @@ From that moment on, the container workload communicates **directly with the phy
 
 ## 🧪 Chaos Experiments & Verification Results
 
-Our automated reproduction script (`reproduce-module9.sh`) executes and validates the following three scenarios:
+Our automated scripts execute and validate the following three scenarios:
+- `run-module9-resilience.sh` — Experiment 1 (Controller)
+- `run-module9-resilience-driver.sh` — Experiment 2 (Kubelet Plugin)
+- `run-module9-resilience-mps.sh` — Experiment 3 (MPS Daemon)
 
 ### 1. Control Plane Failure (Driver Controller)
 - **Scenario**: We simulate a catastrophic failure of the central orchestrator by force-deleting the `nvidia-dra-driver-gpu-controller` pod while a workload (`pod-resilience`) is actively running.
@@ -56,7 +59,7 @@ We discovered a stability issue in **Kind/Containerd** environments where the Ku
 
 ### 2. Idempotency & Nuclear Cleanup
 In distributed systems testing, abrupt terminations leave trailing states (Zombie ResourceClaims) in the API server because the normal Graceful Termination process is bypassed. 
-To make our `reproduce-module9.sh` fully idempotent (rerunnable anytime), we employed a "Nuclear Cleanup" strategy:
+To make our resilience scripts fully idempotent (rerunnable anytime), we employed a "Nuclear Cleanup" strategy:
 ```bash
 kubectl delete pod ... --force --grace-period=0
 kubectl delete resourceclaim ... --force --grace-period=0

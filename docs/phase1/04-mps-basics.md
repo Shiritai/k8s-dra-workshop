@@ -2,15 +2,11 @@
 
 ## 1. Overview
 
-Module 4 demonstrated that MPS can work in a container environment—but at the cost of the Pod having to configure `hostIPC: true`, manually mount `hostPath`, and manually set environment variables. These are security risks and maintenance burdens.
-
-**The Question for Module 4**: Can we let the DRA Driver fully manage MPS, so that the Pod Spec requires no special configuration at all?
-
-The answer is yes. The NVIDIA DRA GPU Driver's `MPSSupport` feature gate provides native MPS management capabilities.
+MPS (Multi-Process Service) enables multiple Pods to share a single GPU concurrently. The NVIDIA DRA GPU Driver's `MPSSupport` feature gate provides native MPS management — the DRA Driver fully manages the MPS daemon lifecycle, so the Pod Spec requires no special configuration.
 
 ## 2. Architecture: Driver-Managed MPS
 
-Unlike the Host MPS in Module 4, the architecture of DRA-managed MPS is as follows:
+The architecture of DRA-managed MPS is as follows:
 
 ```mermaid
 graph TD
@@ -36,39 +32,17 @@ graph TD
 
 ### What DRA Driver Handles Automatically
 
-| Step | Host MPS (Module 4) | DRA-managed MPS (Module 4) |
-|------|---------------------|------------------------------|
-| MPS Daemon Startup | Manual `nvidia-cuda-mps-control -d` | Driver creates Deployment `mps-control-daemon-{id}` |
-| Compute Mode | Manual or not set | Driver automatically sets to `EXCLUSIVE_PROCESS` |
-| MPS Pipe Mount | Pod `hostPath` + `CUDA_MPS_PIPE_DIRECTORY` env | CDI automatically bind mounts + injects env |
-| IPC Channel | Pod `hostIPC: true` (Shared Node IPC namespace) | CDI mounts independent tmpfs to `/dev/shm` |
-| Daemon Lifecycle | Global/Persistent, manual management | Started/Destroyed per Claim, auto-cleaned on Claim release |
-
-### Key Security Improvements
-
-Host MPS's `hostIPC: true` allows the Pod to access **all System V IPC resources of all processes on the Node**, which is a serious security risk in multi-tenant environments. DRA-managed MPS uses **per-claim independent `/dev/shm` tmpfs**, completely eliminating this risk.
+| Step | DRA-managed MPS Behavior |
+|------|--------------------------|
+| MPS Daemon Startup | Driver creates Deployment `mps-control-daemon-{id}` |
+| Compute Mode | Driver automatically sets to `EXCLUSIVE_PROCESS` |
+| MPS Pipe Mount | CDI automatically bind mounts + injects `CUDA_MPS_PIPE_DIRECTORY` env |
+| IPC Channel | CDI mounts independent tmpfs to `/dev/shm` (per-claim isolation) |
+| Daemon Lifecycle | Started/Destroyed per Claim, auto-cleaned on Claim release |
 
 ## 3. Manifest Analysis
 
-### Module 4 (Host MPS)
-
-```yaml
-spec:
-  hostIPC: true                    # Security risk
-  containers:
-  - env:
-    - name: CUDA_MPS_PIPE_DIRECTORY
-      value: /tmp/nvidia-mps       # Manually set
-    volumeMounts:
-    - mountPath: /tmp/nvidia-mps
-      name: mps-pipe               # Manually mounted
-  volumes:
-  - name: mps-pipe
-    hostPath:
-      path: /tmp/nvidia-mps        # Depends on Node path
-```
-
-### Module 4 (DRA-managed MPS)
+### ResourceClaim with MPS
 
 ```yaml
 apiVersion: resource.k8s.io/v1
@@ -105,7 +79,7 @@ spec:
   resourceClaims: [{name: gpu, resourceClaimName: gpu-claim-dra-mps}]
 ```
 
-The Pod spec is completely clean—no `hostIPC`, no `hostPath`, no manual env.
+The Pod spec requires no special MPS configuration — everything is handled by the DRA Driver via the ResourceClaim.
 
 ### Multi-Pod Sharing
 
@@ -133,7 +107,7 @@ resourceClaims: [{name: gpu, resourceClaimName: gpu-claim-dra-mps}]
 ## 5. Verification
 
 ```bash
-./scripts/phase1/run-module4-dra-mps-basics.sh
+./scripts/phase1/run-module4-mps-basics.sh
 ```
 
 ### Verification Items
@@ -164,8 +138,8 @@ The implementation of MPS in the DRA Driver is located in `cmd/gpu-kubelet-plugi
 ## 7. Troubleshooting
 
 ### Pod stuck in Pending
-- **Cause**: `EXCLUSIVE_PROCESS` compute mode conflict. If a process on the Node is already using the GPU (e.g., Module 4's host MPS daemon), the Driver cannot set the compute mode.
-- **Fix**: Ensure the host MPS daemon is stopped (Module 4 cleanup) and no other Pod is exclusively using the GPU.
+- **Cause**: `EXCLUSIVE_PROCESS` compute mode conflict. If another process on the Node is already using the GPU, the Driver cannot set the compute mode.
+- **Fix**: Ensure no other Pod is exclusively using the GPU.
 
 ### MPS Pipe does not exist
 - **Cause**: `MPSSupport` feature gate is not enabled, and the Driver ignored the `sharing.strategy: MPS` configuration.

@@ -116,8 +116,7 @@ Since native Consumable Capacity is blocked, here are the alternatives:
 | Option | Description | Pros | Cons |
 | :--- | :--- | :--- | :--- |
 | **1. MIG (Static Slicing)** | Pre-partition GPU into physical slices (e.g., 7x 3g.20gb) using `mig-parted`. | **Hardware Isolation**, QoS Guarantee, Scheduler Visible. | Requires High-End GPUs (A100/H100), Inflexible. |
-| **2. Host IPC (Hack Mode)** | Run Global Daemon on Node (as in Mod 4/5/6), Pods use `hostIPC: true`. | **Immediate Availability**, Supports Consumer GPUs, Flexible. | **Insecure**, Breaks Isolation, Anti-pattern. |
-| **3. Structured Parameters** | K8s 1.34 API is ready; waiting for NVIDIA Driver to adopt. | **Ultimate Solution**, Secure & Flexible. | Driver 尚未實作。 |
+| **2. Structured Parameters** | K8s 1.34 API is ready; waiting for NVIDIA Driver to adopt. | **Ultimate Solution**, Secure & Flexible. | Driver 尚未實作。 |
 
 ### Conclusion
 
@@ -127,6 +126,6 @@ The blocker is the **Mandatory Opaque Constraint**, which causes the **Blind Sch
 > **Note (K8s 1.34)**: Structured Parameters API is now GA in K8s 1.34. The `capacity.requests` field exists and works at the API level. The remaining blocker is purely on the **NVIDIA Driver side** — once the driver publishes capacity via Structured Parameters instead of Opaque, the Scheduler will be able to perform real capacity accounting.
 
 **Recommendations**:
-- **Short-term (Verify/Dev)**: Continue using **Host IPC Mode** (verified in Module 4/5/6 (Archive)) if sharing is required.
+- **Short-term (Verify/Dev)**: Use **MIG** for hardware-isolated sharing, or **DRA-managed MPS** (Modules 4/5) for software sharing on a single Claim.
 - **Long-term (Production)**: Track NVIDIA Driver releases for **Structured Parameters** adoption.
 

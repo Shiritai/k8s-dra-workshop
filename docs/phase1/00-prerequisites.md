@@ -15,7 +15,6 @@ config:
 flowchart TB
  subgraph Configs["Critical Configurations"]
         CDI["CDI Spec /etc/cdi/nvidia.yaml"]
-        MPS_Host["MPS Control Daemon (Host Process)"]
   end
  subgraph Host["Host Layer"]
     direction TB
@@ -34,13 +33,11 @@ flowchart TB
     %% Explicit Pass-through connections
     CDI == "1. Mount Spec (Discovery)" ==> KindNode
     Driver == "2. Inject Devices (Hardware)" ==> KindNode
-    MPS_Host -. "3. Mount IPC Pipe (Control)" .-> KindNode
 
      GPU:::hardware
      Driver:::host
      Runtime:::host
      CDI:::config
-     MPS_Host:::host
      KindNode:::container
     classDef host fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     classDef container fill:#fff3e0,stroke:#e65100,stroke-width:2px
@@ -85,11 +82,6 @@ sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
 > **Why CDI?**
 > CDI allows the runtime to inject devices based on a standard JSON/YAML spec, decoupling the device discovery from the specific container runtime (Docker, Containerd, CRI-O).
 
-### 4.2. MPS Host Daemon
-For this workshop, to simulate a production environment within Kind, we use a "Host-Pass-Through" pattern for MPS.
-- **Requirement**: The Host must have `nvidia-cuda-mps-control` installed.
-- **Setup**: The Kind node will mount `/tmp/nvidia-mps` from the host.
-
 ## 5. Verification Script
 We provide an automated script to validate all above requirements.
 
@@ -100,7 +92,6 @@ We provide an automated script to validate all above requirements.
 
 **Success Criteria:**
 - [x] Docker NVIDIA runtime detected.
-- [x] MPS Control Daemon is running (or ready to start).
 - [x] CDI spec found at `/etc/cdi/nvidia.yaml`.
 
 ## 6. Troubleshooting
@@ -112,10 +103,6 @@ We provide an automated script to validate all above requirements.
 ### "CDI spec not found"
 *   **Cause**: `nvidia-ctk cdi generate` was never run.
 *   **Impact**: The DRA driver will start but see **0 GPUs**.
-
-### "MPS Control Daemon not running"
-*   **Cause**: The background process isn't started on the host.
-*   **Fix**: Run `nvidia-cuda-mps-control -d`.
 
 ## 7. Official References
 - [NVIDIA Container Toolkit Installation](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)

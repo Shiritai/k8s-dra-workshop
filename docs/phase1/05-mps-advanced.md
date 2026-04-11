@@ -2,12 +2,7 @@
 
 ## 1. Overview
 
-Module 5 demonstrated that MPS resource limits can work—but the limits were set manually via Pod environment variables. In a multi-tenant cluster, this means:
-- Users can modify or remove the limits.
-- Configuration is scattered across each Pod spec, making unified management difficult.
-- Namespace-level quotas cannot constrain MPS resources.
-
-**The Goal of Module 4.5**: Move MPS resource limits from the Pod spec to the **GpuConfig in the ResourceClaim**, so they are unified, managed, and injected by the DRA Driver.
+Module 5 demonstrates how to enforce MPS resource limits (SM thread percentage, memory) centrally via the **GpuConfig in the ResourceClaim**, rather than relying on per-Pod environment variables that users could modify or remove.
 
 ## 2. GpuConfig MPS Parameters
 
@@ -23,23 +18,21 @@ sharing:
       "GPU-xxxx": 2Gi
 ```
 
-### Correspondence with Module 5 Environment Variables
+### GpuConfig Parameters and CUDA Environment Variable Equivalents
 
-| Module 5 (Pod env var) | Module 5 (GpuConfig) | Difference |
-|------------------------|------------------------|------------|
-| `CUDA_MPS_ACTIVE_THREAD_PERCENTAGE=20` | `defaultActiveThreadPercentage: 20` | Same effect, but managed by Driver |
-| `CUDA_MPS_PINNED_DEVICE_MEM_LIMIT=0=1G` | `defaultPinnedDeviceMemoryLimit: 1Gi` | Uses K8s resource.Quantity format |
+| GpuConfig Field | Equivalent CUDA Env Var | Notes |
+|-----------------|-------------------------|-------|
+| `defaultActiveThreadPercentage: 20` | `CUDA_MPS_ACTIVE_THREAD_PERCENTAGE=20` | SM computing power limit, managed by Driver |
+| `defaultPinnedDeviceMemoryLimit: 1Gi` | `CUDA_MPS_PINNED_DEVICE_MEM_LIMIT=0=1G` | Uses K8s `resource.Quantity` format |
 
-### Key Finding: Stricter Memory Limits
+### Key Finding: Memory Limit Enforcement
 
-Experimental results show that DRA-managed MPS memory limits are more effective than host MPS limits:
+The DRA-managed `defaultPinnedDeviceMemoryLimit` constrains both pinned host memory and device memory allocation:
 
-| Test | Module 5 (Host MPS) | Module 5 (DRA MPS) |
-|------|---------------------|----------------------|
-| `cudaMalloc(100MB)` | ✅ Success | ✅ Success |
-| `cudaMalloc(2GB)` limit=1Gi | ⚠️ Potentially Success* | ✅ **OOM Refusal** |
-
-> \* Module 5's `CUDA_MPS_PINNED_DEVICE_MEM_LIMIT` only limits `cudaMallocHost` (pinned host memory) and does not limit `cudaMalloc` (device memory). DRA-managed MPS's `defaultPinnedDeviceMemoryLimit` constrains device memory allocation as well, providing more complete protection.
+| Test | Result |
+|------|--------|
+| `cudaMalloc(100MB)` with limit=1Gi | ✅ Success |
+| `cudaMalloc(2GB)` with limit=1Gi | ✅ **OOM Refusal** (limit enforced) |
 
 ## 3. Part A: Single Pod Resource Limits
 
@@ -138,15 +131,6 @@ spec:
 
 Three Pods each reference `gpu-claim-dra-mps-shared`, and the Driver creates only one MPS daemon.
 
-### Comparison with Module 5 Scheme-B
-
-| Item | Module 5 Scheme-B | Module 5 Part B |
-|------|-------------------|-------------------|
-| Pod Spec | `hostIPC: true` + `hostPath` + 3 env vars | Zero special configuration |
-| Source of Limits | Each Pod sets its own env var | Defined uniformly in Claim |
-| MPS Daemon | Globally shared, manual management | per-Claim independent, auto-managed |
-| Security | Pods can modify their own limits | Limits controlled by Claim owner |
-
 ### Verification Results
 
 ```
@@ -169,7 +153,7 @@ This limitation is expected to be resolved when the driver API is upgraded to su
 ## 6. Verification
 
 ```bash
-./scripts/phase1/run-module5-dra-mps-advanced.sh
+./scripts/phase1/run-module5-mps-advanced.sh
 ```
 
 ## 7. Driver Source Code: How Limits Take Effect

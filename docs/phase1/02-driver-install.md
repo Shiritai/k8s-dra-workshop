@@ -67,7 +67,7 @@ If you inspect the JSON output (`kubectl get resourceslices -o json`), you will 
     }
 }
 ```
-*Note: Attributes are flat (not namespaced). Actual values depend on the driver version and GPU model.*
+*Note: In the raw ResourceSlice JSON, attributes are stored under domain-qualified keys (e.g., `"gpu.nvidia.com"`). In CEL expressions, access them as `device.attributes['gpu.nvidia.com'].productName`. Actual values depend on the driver version and GPU model.*
 
 ## 5. Troubleshooting
 

@@ -7,7 +7,7 @@ In a production HPC or AI environment, two "Day 2" operations are critical for C
 1.  **Admin Access**: The ability to access a GPU node for debugging, even when it is fully allocated to users in "Exclusive Mode".
 2.  **Observability**: The ability to monitor GPU metrics (Utilization, Memory, Power) using standard cloud-native tools like Prometheus.
 
-This module validates how checking Kubernetes DRA handles these requirements.
+This module validates how Kubernetes DRA handles these requirements.
 
 ---
 
@@ -50,11 +50,12 @@ spec:
 ```
 
 ### 1.4 Verification
-Run the automated reproduction script:
+Run the automated scripts:
 ```bash
-./scripts/phase2/reproduce-module8.sh
+./scripts/phase2/run-module8-admin-access.sh
+./scripts/phase2/run-module8-observability.sh
 ```
-*Note: This script handles the necessary environment cleanup and driver setup automatically.*
+*Note: These scripts handle the necessary environment cleanup and driver setup automatically.*
 
 **Expected Output:**
 -   The `pod-admin` successfully enters `Running` state.
@@ -74,8 +75,8 @@ In a Kubernetes DRA environment (especially with Kind), the monitoring container
 
 ### 2.3 Implementation
 We deploy `dcgm-exporter` as a DaemonSet with specific configurations:
--   **Privileged Mode**: `securityContext.privileged: true` to access hardware counters.
--   **Library Injection**: Using standard container runtime hooks to inject `libnvidia-ml.so`.
+-   **DRA Admin Access**: The DCGM exporter obtains GPU access through a `ResourceClaim` with `adminAccess: true`, allowing it to monitor devices even when they are fully allocated to user workloads.
+-   **Elevated Capabilities**: `securityContext.capabilities.add: ["SYS_ADMIN"]` to access hardware counters (not full privileged mode).
 
 ### 2.4 Verification
 The reproduction script automates the deployment and checking of the exporter.
@@ -103,4 +104,4 @@ DCGM_FI_DEV_GPU_UTIL{gpu="0", ...} 98
 ### known Issue: Driver Runtime Deadlock
 *   **Symptom**: Admin Pod hangs in `ContainerCreating`.
 *   **Cause**: The current NVIDIA Driver (v1beta1) has a state management issue where it fails to process Admin Claims if the internal MPS state is "dirty" from previous workloads.
-*   **Workaround**: The `reproduce-module8.sh` script implements a "Safe Mode" that performs a clean re-installation of the driver before granting Admin Access. This ensures a pristine state for verification.
+*   **Workaround**: The `run-module8-admin-access.sh` script implements a "Safe Mode" that performs a clean re-installation of the driver before granting Admin Access. This ensures a pristine state for verification.
