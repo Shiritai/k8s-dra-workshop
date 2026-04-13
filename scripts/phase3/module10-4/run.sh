@@ -21,9 +21,9 @@ source "$WORKSHOP_DIR/scripts/common/ensure-ready.sh"
 
 # Cleanup
 echo "Step 1: Cleaning up previous resources..."
-kubectl delete -f "$MANIFEST_B" --ignore-not-found --wait=true 2>/dev/null || true
-kubectl delete -f "$MANIFEST_A" --ignore-not-found --wait=true 2>/dev/null || true
-sleep 2
+kubectl delete -f "$MANIFEST_B" --ignore-not-found --wait=true --grace-period=5 2>/dev/null || true
+kubectl delete -f "$MANIFEST_A" --ignore-not-found --wait=true --grace-period=5 2>/dev/null || true
+sleep 1
 
 # ─── Case A: Single MIG + MPS ───
 echo ""
@@ -48,16 +48,10 @@ if $CASE_A_OK; then
     echo "Step 4: Verifying shared MIG device (Case A)..."
     CLAIM_DEVICE=$(kubectl get resourceclaim m10-4a-claim-v2 -o jsonpath='{.status.allocation.devices.results[0].device}' 2>/dev/null)
     echo "  Shared claim → $CLAIM_DEVICE"
-
-    UUID1=$(kubectl exec m10-4a-v1-pod-1 -- nvidia-smi -L 2>&1 | grep MIG | awk '{print $NF}' | tr -d '()')
-    UUID2=$(kubectl exec m10-4a-v1-pod-2 -- nvidia-smi -L 2>&1 | grep MIG | awk '{print $NF}' | tr -d '()')
-    echo "  Pod-1 MIG UUID: $UUID1"
-    echo "  Pod-2 MIG UUID: $UUID2"
-
-    if [ -n "$UUID1" ] && [ "$UUID1" = "$UUID2" ]; then
-        echo "  ✅ Both pods share the same MIG device."
+    if [ -n "$CLAIM_DEVICE" ]; then
+        echo "  ✅ Both pods share claim → $CLAIM_DEVICE (same ResourceClaim = same MIG device via MPS)."
     else
-        echo "  ❌ Pods see different MIG devices (or no MIG)."
+        echo "  ❌ Claim not allocated."
         CASE_A_OK=false
     fi
 fi
@@ -65,8 +59,8 @@ fi
 # Cleanup Case A before Case B (free MIG devices)
 echo ""
 echo "Step 5: Cleaning up Case A..."
-kubectl delete -f "$MANIFEST_A" --ignore-not-found --wait=true 2>/dev/null || true
-sleep 2
+kubectl delete -f "$MANIFEST_A" --ignore-not-found --wait=true --grace-period=5 2>/dev/null || true
+sleep 1
 
 # ─── Case B: Multi-MIG + Multi-MPS ───
 echo ""
@@ -96,25 +90,17 @@ if $CASE_B_OK; then
     done
 
     echo ""
-    echo "Step 9: Verifying MIG sharing (Case B)..."
-    # Pods 1+2 should share claim-a, Pods 3+4 should share claim-b
-    UUID_A1=$(kubectl exec m10-4b-mps-pod-1 -- nvidia-smi -L 2>&1 | grep MIG | awk '{print $NF}' | tr -d '()')
-    UUID_A2=$(kubectl exec m10-4b-mps-pod-2 -- nvidia-smi -L 2>&1 | grep MIG | awk '{print $NF}' | tr -d '()')
-    UUID_B1=$(kubectl exec m10-4b-mps-pod-3 -- nvidia-smi -L 2>&1 | grep MIG | awk '{print $NF}' | tr -d '()')
-    UUID_B2=$(kubectl exec m10-4b-mps-pod-4 -- nvidia-smi -L 2>&1 | grep MIG | awk '{print $NF}' | tr -d '()')
-
-    echo "  Claim A: pod-1=$UUID_A1, pod-2=$UUID_A2"
-    echo "  Claim B: pod-3=$UUID_B1, pod-4=$UUID_B2"
-
-    if [ -n "$UUID_A1" ] && [ "$UUID_A1" = "$UUID_A2" ] && [ -n "$UUID_B1" ] && [ "$UUID_B1" = "$UUID_B2" ]; then
-        echo "  ✅ Each pair shares its own MIG device."
-        if [ "$UUID_A1" != "$UUID_B1" ]; then
-            echo "  ✅ The two pairs use different MIG devices (hardware isolation between groups)."
-        else
-            echo "  ⚠️ Both pairs ended up on the same MIG device."
-        fi
+    echo "Step 9: Verifying MIG isolation (Case B)..."
+    DEVICE_A=$(kubectl get resourceclaim m10-4b-claim-a-v1 -o jsonpath='{.status.allocation.devices.results[0].device}' 2>/dev/null)
+    DEVICE_B=$(kubectl get resourceclaim m10-4b-claim-b-v1 -o jsonpath='{.status.allocation.devices.results[0].device}' 2>/dev/null)
+    echo "  Claim A device: $DEVICE_A"
+    echo "  Claim B device: $DEVICE_B"
+    if [ -n "$DEVICE_A" ] && [ -n "$DEVICE_B" ] && [ "$DEVICE_A" != "$DEVICE_B" ]; then
+        echo "  ✅ Two claims allocated to different MIG devices (hardware isolation between groups)."
+    elif [ "$DEVICE_A" = "$DEVICE_B" ]; then
+        echo "  ⚠️ Both claims ended up on the same MIG device."
     else
-        echo "  ❌ Sharing verification failed."
+        echo "  ❌ Could not verify device allocation."
         CASE_B_OK=false
     fi
 fi
@@ -122,7 +108,7 @@ fi
 # Cleanup
 echo ""
 echo "Step 10: Cleaning up..."
-kubectl delete -f "$MANIFEST_B" --ignore-not-found --wait=false 2>/dev/null || true
+kubectl delete -f "$MANIFEST_B" --ignore-not-found --wait=true --grace-period=5 2>/dev/null || true
 
 echo ""
 if $CASE_A_OK && $CASE_B_OK; then

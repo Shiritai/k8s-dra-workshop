@@ -16,6 +16,7 @@
 _ensure_ready() {
     local NS="nvidia-system"
     local DS="nvidia-dra-driver-gpu-kubelet-plugin"
+    local PLUGIN_LABEL="nvidia-dra-driver-gpu-component=kubelet-plugin"
     local CTRL_NODE="workshop-dra-control-plane"
 
     echo ">>> Ensuring DRA environment is ready..."
@@ -53,14 +54,44 @@ _ensure_ready() {
     if [ -n "$PODS" ]; then
         echo "  Cleaning leftover pods..."
         kubectl delete pods --all --force --grace-period=0 2>/dev/null || true
-        sleep 2
     fi
 
     local CLAIMS=$(kubectl get resourceclaims --no-headers -o name 2>/dev/null || true)
     if [ -n "$CLAIMS" ]; then
         echo "  Cleaning leftover claims..."
-        kubectl delete resourceclaims --all --ignore-not-found 2>/dev/null || true
-        sleep 2
+        # Remove finalizers from stuck claims, then delete
+        for claim in $(kubectl get resourceclaims --no-headers -o name 2>/dev/null); do
+            kubectl patch "$claim" -p '{"metadata":{"finalizers":null}}' --type=merge 2>/dev/null || true
+        done
+        kubectl delete resourceclaims --all --force --grace-period=0 2>/dev/null || true
+    fi
+
+    # Also clean configmaps from module11 VRAM tests
+    kubectl delete configmap m11-1b-vram-stress --ignore-not-found 2>/dev/null || true
+
+    # 6b. If we force-deleted anything, clear DRA checkpoint to avoid stale UID errors
+    if [ -n "$PODS" ] || [ -n "$CLAIMS" ]; then
+        echo "  Clearing DRA checkpoint after force cleanup..."
+        docker exec "$CTRL_NODE" bash -c 'find /var/lib/kubelet/plugins -name "checkpoint.json" -delete' 2>/dev/null || true
+        # Delete plugin pod so daemonset recreates it with clean checkpoint
+        echo "  Recreating plugin pod..."
+        kubectl delete pods -n "$NS" -l "$PLUGIN_LABEL" --force --grace-period=0 2>/dev/null || true
+        # Wait for new plugin pod to be Running+Ready
+        echo "  Waiting for plugin pod..."
+        for _i in $(seq 1 30); do
+            local ready=$(kubectl get pods -n "$NS" -l "$PLUGIN_LABEL" \
+                -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+            if [ "$ready" = "True" ]; then break; fi
+            sleep 2
+        done
+        # Wait for GPU ResourceSlice to be published
+        echo "  Waiting for GPU ResourceSlice..."
+        for _i in $(seq 1 30); do
+            if kubectl get resourceslices --no-headers 2>/dev/null | grep -q "gpu.nvidia.com"; then
+                break
+            fi
+            sleep 2
+        done
     fi
 
     # Also clean MPS daemon deployments that may be stale

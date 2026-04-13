@@ -12,9 +12,9 @@ spec:
         driver: gpu.nvidia.com
         parameters:
           apiVersion: resource.nvidia.com/v1beta1
-          kind: GpuConfig
+          kind: MigDeviceConfig
           sharing:
-            strategy: mps
+            strategy: MPS
     requests:
     - name: mig-req
       exactly:
