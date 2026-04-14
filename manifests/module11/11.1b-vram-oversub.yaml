@@ -1,0 +1,135 @@
+# M11.1b: VRAM Oversubscription via MPS
+# Goal: 3 Pods each limited to 8Gi pinned memory (total 24Gi) on a GPU that may have less.
+#       Each pod runs a CUDA program to allocate its limit and observe OOM behavior.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: m11-1b-vram-stress
+data:
+  stress_vram.cu: |
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <unistd.h>
+    #include <cuda_runtime.h>
+
+    int main() {
+        const char* env = getenv("ALLOC_MB");
+        size_t alloc_mb = env ? (size_t)atol(env) : 4096;
+        size_t alloc_bytes = alloc_mb * 1024ULL * 1024ULL;
+
+        size_t free_mem, total_mem;
+        cudaMemGetInfo(&free_mem, &total_mem);
+        printf("[cuda] GPU memory: total=%zu MiB, free=%zu MiB\n",
+               total_mem / (1024*1024), free_mem / (1024*1024));
+        printf("[cuda] Attempting to allocate %zu MiB...\n", alloc_mb);
+
+        void* ptr = NULL;
+        cudaError_t err = cudaMalloc(&ptr, alloc_bytes);
+        if (err == cudaSuccess) {
+            printf("[cuda] Success: %zu MiB allocated at %p\n", alloc_mb, ptr);
+        } else {
+            printf("[cuda] FAILED: %s (code %d)\n", cudaGetErrorString(err), (int)err);
+        }
+
+        printf("Sleeping to keep pod alive...\n");
+        fflush(stdout);
+        sleep(3600);
+        if (ptr) cudaFree(ptr);
+        return 0;
+    }
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m11-1b-claim
+spec:
+  devices:
+    config:
+    - opaque:
+        driver: gpu.nvidia.com
+        parameters:
+          apiVersion: resource.nvidia.com/v1beta1
+          kind: MigDeviceConfig
+          sharing:
+            strategy: MPS
+            mpsConfig:
+              defaultActiveThreadPercentage: 50
+              defaultPinnedDeviceMemoryLimit: 8Gi
+    requests:
+    - name: gpu-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m11-1b-pod-1
+spec:
+  containers:
+  - name: cuda-ctr
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "nvcc -o /tmp/stress /scripts/stress_vram.cu -lcudart && /tmp/stress"]
+    env:
+    - name: ALLOC_MB
+      value: "8192"
+    volumeMounts:
+    - name: scripts
+      mountPath: /scripts
+    resources:
+      claims: [{name: gpu}]
+  volumes:
+  - name: scripts
+    configMap:
+      name: m11-1b-vram-stress
+  resourceClaims: [{name: gpu, resourceClaimName: m11-1b-claim}]
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m11-1b-pod-2
+spec:
+  containers:
+  - name: cuda-ctr
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "nvcc -o /tmp/stress /scripts/stress_vram.cu -lcudart && /tmp/stress"]
+    env:
+    - name: ALLOC_MB
+      value: "8192"
+    volumeMounts:
+    - name: scripts
+      mountPath: /scripts
+    resources:
+      claims: [{name: gpu}]
+  volumes:
+  - name: scripts
+    configMap:
+      name: m11-1b-vram-stress
+  resourceClaims: [{name: gpu, resourceClaimName: m11-1b-claim}]
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m11-1b-pod-3
+spec:
+  containers:
+  - name: cuda-ctr
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "nvcc -o /tmp/stress /scripts/stress_vram.cu -lcudart && /tmp/stress"]
+    env:
+    - name: ALLOC_MB
+      value: "8192"
+    volumeMounts:
+    - name: scripts
+      mountPath: /scripts
+    resources:
+      claims: [{name: gpu}]
+  volumes:
+  - name: scripts
+    configMap:
+      name: m11-1b-vram-stress
+  resourceClaims: [{name: gpu, resourceClaimName: m11-1b-claim}]
+  restartPolicy: Never
