@@ -1,0 +1,105 @@
+# M11-2b: Client-Side VRAM Limit (CUDA_MPS_PINNED_DEVICE_MEM_LIMIT)
+# Goal: Prove per-client VRAM limit works on MIG via env var.
+#       Pod 1: 4.5 GiB (over 4 GiB limit → OOM), Pod 2/3: 3 GiB (success)
+# CUDA source: cuda/vram_limit.cu (shared with 11-2a)
+
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m11-2b-claim
+spec:
+  devices:
+    config:
+    - opaque:
+        driver: gpu.nvidia.com
+        parameters:
+          apiVersion: resource.nvidia.com/v1beta1
+          kind: MigDeviceConfig
+          sharing:
+            strategy: MPS
+            mpsConfig:
+              defaultActiveThreadPercentage: 50
+              defaultPinnedDeviceMemoryLimit: 4Gi
+    requests:
+    - name: gpu-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m11-2b-pod-1
+spec:
+  containers:
+  - name: cuda-ctr
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "nvcc -o /tmp/limit_test /cuda/vram_limit.cu -lcudart && /tmp/limit_test"]
+    env:
+    - name: ALLOC_MIB
+      value: "4608"
+    - name: CUDA_MPS_PINNED_DEVICE_MEM_LIMIT
+      value: "0=4096M"
+    volumeMounts:
+    - name: cuda-src
+      mountPath: /cuda
+    resources:
+      claims: [{name: gpu}]
+  volumes:
+  - name: cuda-src
+    configMap:
+      name: m11-2-cuda
+  resourceClaims: [{name: gpu, resourceClaimName: m11-2b-claim}]
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m11-2b-pod-2
+spec:
+  containers:
+  - name: cuda-ctr
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "nvcc -o /tmp/limit_test /cuda/vram_limit.cu -lcudart && /tmp/limit_test"]
+    env:
+    - name: ALLOC_MIB
+      value: "3072"
+    - name: CUDA_MPS_PINNED_DEVICE_MEM_LIMIT
+      value: "0=4096M"
+    volumeMounts:
+    - name: cuda-src
+      mountPath: /cuda
+    resources:
+      claims: [{name: gpu}]
+  volumes:
+  - name: cuda-src
+    configMap:
+      name: m11-2-cuda
+  resourceClaims: [{name: gpu, resourceClaimName: m11-2b-claim}]
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m11-2b-pod-3
+spec:
+  containers:
+  - name: cuda-ctr
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "nvcc -o /tmp/limit_test /cuda/vram_limit.cu -lcudart && /tmp/limit_test"]
+    env:
+    - name: ALLOC_MIB
+      value: "3072"
+    - name: CUDA_MPS_PINNED_DEVICE_MEM_LIMIT
+      value: "0=4096M"
+    volumeMounts:
+    - name: cuda-src
+      mountPath: /cuda
+    resources:
+      claims: [{name: gpu}]
+  volumes:
+  - name: cuda-src
+    configMap:
+      name: m11-2-cuda
+  resourceClaims: [{name: gpu, resourceClaimName: m11-2b-claim}]
+  restartPolicy: Never

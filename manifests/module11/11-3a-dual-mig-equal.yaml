@@ -1,0 +1,87 @@
+# M11-3a: Dual-MIG Equal MPS Split (2 × MPS 50%)
+# Goal: Test whether a single Pod can use 2 MIG devices via MPS.
+# CUDA source: cuda/dual_mig_stress.cu
+
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m11-3a-claim-mig0
+spec:
+  devices:
+    requests:
+    - name: mig
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+    config:
+    - opaque:
+        driver: gpu.nvidia.com
+        parameters:
+          apiVersion: resource.nvidia.com/v1beta1
+          kind: MigDeviceConfig
+          sharing:
+            strategy: MPS
+            mpsConfig:
+              defaultActiveThreadPercentage: 50
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m11-3a-claim-mig1
+spec:
+  devices:
+    requests:
+    - name: mig
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+    config:
+    - opaque:
+        driver: gpu.nvidia.com
+        parameters:
+          apiVersion: resource.nvidia.com/v1beta1
+          kind: MigDeviceConfig
+          sharing:
+            strategy: MPS
+            mpsConfig:
+              defaultActiveThreadPercentage: 50
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m11-3a-pod
+spec:
+  containers:
+  - name: cuda-stress
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command:
+    - sh
+    - -c
+    - |
+      set -e
+      echo "=== Compiling dual MIG CUDA stress test ==="
+      nvcc -o /tmp/dual_mig_stress /src/dual_mig_stress.cu -lpthread
+      echo "=== Running ==="
+      /tmp/dual_mig_stress
+      echo "=== nvidia-smi snapshot ==="
+      nvidia-smi || true
+      echo "=== MPS status ==="
+      ls -la /tmp/nvidia-mps* 2>/dev/null || echo "No MPS control files"
+      env | grep -i mps || echo "No MPS env vars"
+    volumeMounts:
+    - name: cuda-src
+      mountPath: /src
+    resources:
+      claims:
+      - name: mig0
+      - name: mig1
+  volumes:
+  - name: cuda-src
+    configMap:
+      name: m11-3a-cuda
+  resourceClaims:
+  - name: mig0
+    resourceClaimName: m11-3a-claim-mig0
+  - name: mig1
+    resourceClaimName: m11-3a-claim-mig1
+  restartPolicy: Never

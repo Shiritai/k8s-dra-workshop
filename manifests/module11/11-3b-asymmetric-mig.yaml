@@ -1,0 +1,77 @@
+# M11-3b: Asymmetric MIG — Exclusive vs MPS 30%
+# Goal: Test throughput difference between exclusive and MPS-limited MIG.
+# CUDA source: cuda/asymmetric_stress.cu
+
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m11-3b-claim-exclusive
+spec:
+  devices:
+    requests:
+    - name: mig
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m11-3b-claim-mps30
+spec:
+  devices:
+    requests:
+    - name: mig
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+    config:
+    - opaque:
+        driver: gpu.nvidia.com
+        parameters:
+          apiVersion: resource.nvidia.com/v1beta1
+          kind: MigDeviceConfig
+          sharing:
+            strategy: MPS
+            mpsConfig:
+              defaultActiveThreadPercentage: 30
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m11-3b-pod
+spec:
+  containers:
+  - name: cuda-stress
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command:
+    - sh
+    - -c
+    - |
+      set -e
+      echo "=== Compiling asymmetric MIG CUDA stress test ==="
+      nvcc -o /tmp/asymmetric_stress /src/asymmetric_stress.cu
+      echo "=== Running ==="
+      /tmp/asymmetric_stress
+      echo "=== nvidia-smi snapshot ==="
+      nvidia-smi || true
+      echo "=== MPS status ==="
+      ls -la /tmp/nvidia-mps* 2>/dev/null || echo "No MPS control files"
+      env | grep -i mps || echo "No MPS env vars"
+    volumeMounts:
+    - name: cuda-src
+      mountPath: /src
+    resources:
+      claims:
+      - name: exclusive
+      - name: mps30
+  volumes:
+  - name: cuda-src
+    configMap:
+      name: m11-3b-cuda
+  resourceClaims:
+  - name: exclusive
+    resourceClaimName: m11-3b-claim-exclusive
+  - name: mps30
+    resourceClaimName: m11-3b-claim-mps30
+  restartPolicy: Never

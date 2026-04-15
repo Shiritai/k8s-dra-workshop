@@ -1,0 +1,89 @@
+# M11-1a: Server-Side SM Thread Limit (Daemon-Level)
+# Goal: Measure actual compute throughput when 3 Pods each get 50% SM threads
+#       (total 150% > 100%) on a shared MIG device via MPS.
+# CUDA source: cuda/fma_bench.cu (shared with 11-1b)
+
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m11-1a-claim
+spec:
+  devices:
+    config:
+    - opaque:
+        driver: gpu.nvidia.com
+        parameters:
+          apiVersion: resource.nvidia.com/v1beta1
+          kind: MigDeviceConfig
+          sharing:
+            strategy: MPS
+            mpsConfig:
+              defaultActiveThreadPercentage: 50
+    requests:
+    - name: gpu-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m11-1a-pod-1
+spec:
+  containers:
+  - name: cuda-bench
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "nvcc -O3 -o /tmp/bench /cuda/fma_bench.cu && /tmp/bench"]
+    volumeMounts:
+    - name: cuda-src
+      mountPath: /cuda
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: m11-1a-claim}]
+  volumes:
+  - name: cuda-src
+    configMap:
+      name: m11-1-cuda
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m11-1a-pod-2
+spec:
+  containers:
+  - name: cuda-bench
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "nvcc -O3 -o /tmp/bench /cuda/fma_bench.cu && /tmp/bench"]
+    volumeMounts:
+    - name: cuda-src
+      mountPath: /cuda
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: m11-1a-claim}]
+  volumes:
+  - name: cuda-src
+    configMap:
+      name: m11-1-cuda
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m11-1a-pod-3
+spec:
+  containers:
+  - name: cuda-bench
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "nvcc -O3 -o /tmp/bench /cuda/fma_bench.cu && /tmp/bench"]
+    volumeMounts:
+    - name: cuda-src
+      mountPath: /cuda
+    resources:
+      claims: [{name: gpu}]
+  resourceClaims: [{name: gpu, resourceClaimName: m11-1a-claim}]
+  volumes:
+  - name: cuda-src
+    configMap:
+      name: m11-1-cuda
+  restartPolicy: Never

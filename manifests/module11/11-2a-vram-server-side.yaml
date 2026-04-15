@@ -1,0 +1,99 @@
+# M11-2a: Server-Side VRAM Limit (defaultPinnedDeviceMemoryLimit)
+# Goal: Prove that defaultPinnedDeviceMemoryLimit: 8Gi is NOT enforced on MIG.
+#       Pod 1: 6 GiB, Pod 2: 12 GiB (over limit), Pod 3: 6 GiB
+# CUDA source: cuda/vram_limit.cu (shared with 11-2b)
+
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: m11-2a-claim
+spec:
+  devices:
+    config:
+    - opaque:
+        driver: gpu.nvidia.com
+        parameters:
+          apiVersion: resource.nvidia.com/v1beta1
+          kind: MigDeviceConfig
+          sharing:
+            strategy: MPS
+            mpsConfig:
+              defaultActiveThreadPercentage: 50
+              defaultPinnedDeviceMemoryLimit: 8Gi
+    requests:
+    - name: gpu-req
+      exactly:
+        count: 1
+        deviceClassName: mig.nvidia.com
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m11-2a-pod-1
+spec:
+  containers:
+  - name: cuda-ctr
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "nvcc -o /tmp/limit_test /cuda/vram_limit.cu -lcudart && /tmp/limit_test"]
+    env:
+    - name: ALLOC_MIB
+      value: "6144"
+    volumeMounts:
+    - name: cuda-src
+      mountPath: /cuda
+    resources:
+      claims: [{name: gpu}]
+  volumes:
+  - name: cuda-src
+    configMap:
+      name: m11-2-cuda
+  resourceClaims: [{name: gpu, resourceClaimName: m11-2a-claim}]
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m11-2a-pod-2
+spec:
+  containers:
+  - name: cuda-ctr
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "nvcc -o /tmp/limit_test /cuda/vram_limit.cu -lcudart && /tmp/limit_test"]
+    env:
+    - name: ALLOC_MIB
+      value: "12288"
+    volumeMounts:
+    - name: cuda-src
+      mountPath: /cuda
+    resources:
+      claims: [{name: gpu}]
+  volumes:
+  - name: cuda-src
+    configMap:
+      name: m11-2-cuda
+  resourceClaims: [{name: gpu, resourceClaimName: m11-2a-claim}]
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: m11-2a-pod-3
+spec:
+  containers:
+  - name: cuda-ctr
+    image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+    command: ["sh", "-c", "nvcc -o /tmp/limit_test /cuda/vram_limit.cu -lcudart && /tmp/limit_test"]
+    env:
+    - name: ALLOC_MIB
+      value: "6144"
+    volumeMounts:
+    - name: cuda-src
+      mountPath: /cuda
+    resources:
+      claims: [{name: gpu}]
+  volumes:
+  - name: cuda-src
+    configMap:
+      name: m11-2-cuda
+  resourceClaims: [{name: gpu, resourceClaimName: m11-2a-claim}]
+  restartPolicy: Never
