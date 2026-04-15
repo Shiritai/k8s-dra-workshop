@@ -1,10 +1,10 @@
 #!/bin/bash
 # M11.2: MIG MPS VRAM Limits
 #
-# Test 11-2a: Server-side VRAM limit (defaultPinnedDeviceMemoryLimit: 8Gi)
-#             3 Pods (6/12/6 GiB) — proves limit is NOT enforced on MIG
+# Test 11-2a: Server-side VRAM limit (defaultPinnedDeviceMemoryLimit: 4Gi)
+#             3 Pods (4.5/3/3 GiB) — proves limit is NOT enforced on MIG
 # Test 11-2b: Client-side VRAM limit (CUDA_MPS_PINNED_DEVICE_MEM_LIMIT=0=4096M)
-#             3 Pods (4.5/3/3 GiB) — enforces limit, virtualizes cudaMemGetInfo
+#             No server-side limit — 3 Pods (4.5/3/3 GiB) — enforces limit, virtualizes cudaMemGetInfo
 
 set -e
 
@@ -44,6 +44,7 @@ sleep 3
 
 for claim in \
     m11-1a-stress-claim m11-1a-thread-claim m11-1a-claim \
+    m11-1a-claim-10 m11-1a-claim-30 m11-1a-claim-50 \
     m11-1b-claim m11-1b-limit-claim m11-1b-mps-limit-claim m11-1c-mps-limit-claim \
     m11-2a-claim m11-2b-claim \
     m11-2a-stress-mig0 m11-2a-stress-mig1 m11-2a-claim-gpu0 m11-2a-claim-gpu1 \
@@ -70,10 +71,10 @@ echo "  Cleanup done."
 # ─────────────────────────────────────────────────────────────────
 echo ""
 echo "================================================================"
-echo "  Test 11-2a: Server-Side VRAM (defaultPinnedDeviceMemoryLimit: 8Gi)"
-echo "  Pod 1: 6 GiB → expect success (under 8 GiB limit)"
-echo "  Pod 2: 12 GiB → expect success IF limit broken (over 8 GiB limit)"
-echo "  Pod 3: 6 GiB → expect success or OOM (depends on remaining physical memory)"
+echo "  Test 11-2a: Server-Side VRAM (defaultPinnedDeviceMemoryLimit: 4Gi)"
+echo "  Pod 1: 4.5 GiB → expect success IF limit broken (over 4 GiB limit)"
+echo "  Pod 2:   3 GiB → expect success (under limit)"
+echo "  Pod 3:   3 GiB → expect success (under limit)"
 echo "  Purpose: Prove defaultPinnedDeviceMemoryLimit is NOT enforced on MIG"
 echo "================================================================"
 CUDA_DIR="$WORKSHOP_DIR/manifests/module11/cuda"
@@ -94,7 +95,7 @@ done
 echo ""
 echo "Step 3: Waiting for CUDA output (up to 90s)..."
 for attempt in $(seq 1 45); do
-    DONE=$(kubectl logs m11-2a-pod-2 2>/dev/null | grep -c '\[cuda\]' || true)
+    DONE=$(kubectl logs m11-2a-pod-1 2>/dev/null | grep -c '\[cuda\]' || true)
     if [ "$DONE" -ge 2 ]; then break; fi
     sleep 2
 done
@@ -111,20 +112,20 @@ echo "  ────────────────────────
 
 echo ""
 echo "Step 5: Analysis (11-2a)"
-# Pod 2 tries 12 GiB with 8 GiB limit — if it succeeds, limit is broken
-if kubectl logs m11-2a-pod-2 2>/dev/null | grep -q 'Success'; then
-    echo "  --> ✅ Pod 2 (12 GiB) succeeded despite 8 GiB limit: defaultPinnedDeviceMemoryLimit NOT enforced on MIG"
-elif kubectl logs m11-2a-pod-2 2>/dev/null | grep -q 'FAILED'; then
-    echo "  --> Pod 2 (12 GiB) failed — limit may be working, or physical OOM"
+# Pod 1 tries 4.5 GiB with 4 GiB limit — if it succeeds, limit is broken
+if kubectl logs m11-2a-pod-1 2>/dev/null | grep -q 'Success'; then
+    echo "  --> Pod 1 (4.5 GiB) succeeded despite 4 GiB limit: defaultPinnedDeviceMemoryLimit NOT enforced on MIG"
+elif kubectl logs m11-2a-pod-1 2>/dev/null | grep -q 'FAILED'; then
+    echo "  --> Pod 1 (4.5 GiB) failed — limit may be working, or physical OOM"
 else
-    echo "  --> Pod 2: no result yet"
+    echo "  --> Pod 1: no result yet"
 fi
 
-for pod in m11-2a-pod-1 m11-2a-pod-3; do
+for pod in m11-2a-pod-2 m11-2a-pod-3; do
     if kubectl logs "$pod" 2>/dev/null | grep -q 'Success'; then
-        echo "  --> ✅ $pod (6 GiB) succeeded"
+        echo "  --> $pod (3 GiB) succeeded"
     elif kubectl logs "$pod" 2>/dev/null | grep -q 'FAILED'; then
-        echo "  --> ⚠ $pod (6 GiB) failed (likely physical OOM after others allocated)"
+        echo "  --> $pod (3 GiB) failed unexpectedly"
     fi
 done
 
@@ -143,6 +144,7 @@ sleep 2
 echo ""
 echo "================================================================"
 echo "  Test 11-2b: Client-Side VRAM (CUDA_MPS_PINNED_DEVICE_MEM_LIMIT=0=4096M)"
+echo "  No server-side limit — pure client-side MPS VRAM enforcement"
 echo "  Pod 1: 4.5 GiB → expect MPS limit OOM (> 4 GiB limit, fits physically)"
 echo "  Pod 2:   3 GiB → expect success (within limit)"
 echo "  Pod 3:   3 GiB → expect success (within limit)"
@@ -194,22 +196,22 @@ echo "  Succeeded: $SUCCESS_B, Failed: $FAIL_B"
 POD1_FREE=$(kubectl logs m11-2b-pod-1 2>/dev/null | grep 'GPU memory:' | grep -oP 'free=\K[0-9]+' || echo "0")
 if kubectl logs m11-2b-pod-1 2>/dev/null | grep -q 'FAILED'; then
     if [ "$POD1_FREE" -le 4096 ] 2>/dev/null && [ "$POD1_FREE" -gt 0 ] 2>/dev/null; then
-        echo "  --> ✅ Pod 1 (4.5 GiB) rejected: cudaMemGetInfo reports free=${POD1_FREE} MiB (virtualized to ~4 GiB limit)"
+        echo "  --> Pod 1 (4.5 GiB) rejected: cudaMemGetInfo reports free=${POD1_FREE} MiB (virtualized to ~4 GiB limit)"
     elif [ "$POD1_FREE" -gt 4096 ] 2>/dev/null; then
-        echo "  --> ✅ Pod 1 (4.5 GiB) rejected by MPS limit: free=${POD1_FREE} MiB > 4096 MiB, so it's NOT physical OOM"
+        echo "  --> Pod 1 (4.5 GiB) rejected by MPS limit: free=${POD1_FREE} MiB > 4096 MiB, so it's NOT physical OOM"
     else
-        echo "  --> ⚠ Pod 1 (4.5 GiB) failed: free=${POD1_FREE} MiB — could be physical OOM, not MPS enforcement"
+        echo "  --> Pod 1 (4.5 GiB) failed: free=${POD1_FREE} MiB — could be physical OOM, not MPS enforcement"
     fi
 else
-    echo "  --> ❌ Pod 1 (4.5 GiB) succeeded: client-side MPS limit did NOT work"
+    echo "  --> Pod 1 (4.5 GiB) succeeded: client-side MPS limit did NOT work"
 fi
 
 # Check Pod 2 and 3 (should succeed)
 for pod in m11-2b-pod-2 m11-2b-pod-3; do
     if kubectl logs "$pod" 2>/dev/null | grep -q 'Success'; then
-        echo "  --> ✅ $pod (3 GiB) succeeded: within MPS limit"
+        echo "  --> $pod (3 GiB) succeeded: within MPS limit"
     elif kubectl logs "$pod" 2>/dev/null | grep -q 'FAILED'; then
-        echo "  --> ❌ $pod (3 GiB) failed unexpectedly"
+        echo "  --> $pod (3 GiB) failed unexpectedly"
     fi
 done
 
@@ -226,5 +228,5 @@ echo ""
 echo "=== Module 11.2 Complete ==="
 echo ""
 echo "Summary:"
-echo "  11-2a — Server-side VRAM: defaultPinnedDeviceMemoryLimit NOT enforced on MIG"
-echo "  11-2b — Client-side VRAM: CUDA_MPS_PINNED_DEVICE_MEM_LIMIT enforces limit, virtualizes cudaMemGetInfo"
+echo "  11-2a — Server-side VRAM: 4 GiB limit NOT enforced on MIG (4.5 GiB alloc succeeds)"
+echo "  11-2b — Client-side VRAM: 4 GiB limit enforced (4.5 GiB alloc rejected, cudaMemGetInfo virtualized)"

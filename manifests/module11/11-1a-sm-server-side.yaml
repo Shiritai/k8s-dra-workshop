@@ -1,6 +1,8 @@
 # M11-1a: Server-Side SM Thread Limit (Daemon-Level)
-# Goal: Measure actual compute throughput when 3 Pods each get 50% SM threads
-#       (total 150% > 100%) on a shared MIG device via MPS.
+# Goal: 1 shared ResourceClaim with defaultActiveThreadPercentage: 50%, 3 Pods sharing it.
+#       All 3 pods share the same MPS daemon on the same MIG device.
+#       Since defaultActiveThreadPercentage is per-daemon (not per-client),
+#       all pods see the same 50% SM ceiling → expect ~equal GFLOPS.
 # CUDA source: cuda/fma_bench.cu (shared with 11-1b)
 
 apiVersion: resource.k8s.io/v1

@@ -1,6 +1,7 @@
 # M11-1b: Client-Side SM Thread Limit (CUDA_MPS_ACTIVE_THREAD_PERCENTAGE)
 # Goal: Prove per-client SM limits on MIG via env var.
-#       Pod 1: 10%, Pod 2: 30%, Pod 3: 50% (capped by daemon's 50%)
+#       Daemon ceiling is 100% (no server-side limit), purely client-side control.
+#       Pod 1: 10%, Pod 2: 30%, Pod 3: 50%
 # CUDA source: cuda/fma_bench.cu (shared with 11-1a)
 
 apiVersion: resource.k8s.io/v1
@@ -17,8 +18,6 @@ spec:
           kind: MigDeviceConfig
           sharing:
             strategy: MPS
-            mpsConfig:
-              defaultActiveThreadPercentage: 50
     requests:
     - name: gpu-req
       exactly:

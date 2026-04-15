@@ -52,6 +52,7 @@ sleep 3
 # Delete ALL claims
 for claim in \
     m11-1a-stress-claim m11-1a-thread-claim m11-1a-claim \
+    m11-1a-claim-10 m11-1a-claim-30 m11-1a-claim-50 \
     m11-1b-claim m11-1b-limit-claim m11-1b-mps-limit-claim m11-1c-mps-limit-claim \
     m11-2a-claim m11-2b-claim \
     m11-2a-stress-mig0 m11-2a-stress-mig1 m11-2a-claim-gpu0 m11-2a-claim-gpu1 \

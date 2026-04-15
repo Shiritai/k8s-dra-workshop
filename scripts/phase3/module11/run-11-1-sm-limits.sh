@@ -1,8 +1,10 @@
 #!/bin/bash
 # M11-1: MIG MPS SM Limits
 #
-# Test 11-1a: Server-side SM limit — daemon-level defaultActiveThreadPercentage: 50%, 3 pods share 1 MIG
-# Test 11-1b: Client-side SM limit — CUDA_MPS_ACTIVE_THREAD_PERCENTAGE = 10/30/50%, 3 pods share 1 MIG
+# Test 11-1a: Server-side SM limit — 1 shared claim with defaultActiveThreadPercentage=50%,
+#             3 pods share 1 MIG device → all see same 50% ceiling (per-daemon, not per-client)
+# Test 11-1b: Client-side SM limit — CUDA_MPS_ACTIVE_THREAD_PERCENTAGE = 10/30/50%,
+#             3 pods share 1 MIG via 1 claim (daemon ceiling 100%, no server-side limit)
 
 set -e
 
@@ -42,6 +44,7 @@ sleep 3
 
 for claim in \
     m11-1a-stress-claim m11-1a-thread-claim m11-1a-claim \
+    m11-1a-claim-10 m11-1a-claim-30 m11-1a-claim-50 \
     m11-1b-claim m11-1b-limit-claim m11-1b-mps-limit-claim m11-1c-mps-limit-claim \
     m11-2a-claim m11-2b-claim \
     m11-2a-stress-mig0 m11-2a-stress-mig1 m11-2a-claim-gpu0 m11-2a-claim-gpu1 \
@@ -64,13 +67,14 @@ sleep 2
 echo "  Cleanup done."
 
 # ─────────────────────────────────────────────────────────────────
-# Test 11-1a: Server-Side SM Limit (daemon-level 50%, 3 pods)
+# Test 11-1a: Server-Side SM Limit (daemon-level, 1 shared claim)
 # ─────────────────────────────────────────────────────────────────
 echo ""
 echo "================================================================"
-echo "  Test 11-1a: Server-Side SM Limit"
-echo "  daemon-level defaultActiveThreadPercentage: 50%"
-echo "  3 pods sharing 1 MIG → expect ~same GFLOPS"
+echo "  Test 11-1a: Server-Side SM Limit (Daemon-Level)"
+echo "  1 shared claim: defaultActiveThreadPercentage = 50%"
+echo "  3 pods sharing 1 MIG device via MPS"
+echo "  → expect ~equal GFLOPS (daemon ceiling applies to all clients)"
 echo "================================================================"
 CUDA_DIR="$WORKSHOP_DIR/manifests/module11/cuda"
 
@@ -92,17 +96,21 @@ for pod in m11-1a-pod-1 m11-1a-pod-2 m11-1a-pod-3; do
 done
 
 echo ""
-echo "Step 3: Claim allocation..."
+echo "Step 3: Claim allocation (1 shared claim, 1 MIG device)..."
 CLAIM_DEV=$(kubectl get resourceclaim m11-1a-claim \
     -o jsonpath='{.status.allocation.devices.results[0].device}' 2>/dev/null)
-echo "  Shared claim device: $CLAIM_DEV"
+echo "  m11-1a-claim -> $CLAIM_DEV (shared by 3 pods)"
 
 echo ""
-echo "Step 4: Waiting for benchmark output (up to 60s)..."
-for attempt in $(seq 1 30); do
-    if kubectl logs m11-1a-pod-1 2>/dev/null | grep -q '\[bench\] iterations'; then
-        break
-    fi
+echo "Step 4: Waiting for ALL 3 pods benchmark output (up to 90s)..."
+for attempt in $(seq 1 45); do
+    DONE=0
+    for pod in m11-1a-pod-1 m11-1a-pod-2 m11-1a-pod-3; do
+        if kubectl logs "$pod" 2>/dev/null | grep -q '\[bench\] iterations'; then
+            DONE=$((DONE + 1))
+        fi
+    done
+    if [ "$DONE" -eq 3 ]; then break; fi
     sleep 2
 done
 
@@ -110,17 +118,31 @@ echo ""
 echo "Step 5: FMA Benchmark Results (Server-Side SM Limit)"
 echo "  ─────────────────────────────────────────────────"
 for pod in m11-1a-pod-1 m11-1a-pod-2 m11-1a-pod-3; do
+    SM_LINE=$(kubectl logs "$pod" 2>/dev/null | grep '\[cuda\] device:' || true)
     RESULT=$(kubectl logs "$pod" 2>/dev/null | grep '\[bench\] iterations' || echo "(no output)")
-    echo "  $pod: $RESULT"
+    echo "  $pod:"
+    echo "    $SM_LINE"
+    echo "    $RESULT"
 done
 echo "  ─────────────────────────────────────────────────"
+
+echo ""
+echo "Step 5b: Analysis (11-1a)"
+for pod in m11-1a-pod-1 m11-1a-pod-2 m11-1a-pod-3; do
+    GFLOPS=$(kubectl logs "$pod" 2>/dev/null | grep '\[bench\] iterations' | grep -oP 'throughput=\K[0-9.]+' || echo "?")
+    SMS=$(kubectl logs "$pod" 2>/dev/null | grep '\[cuda\] device:' | grep -oP 'SMs: \K[0-9]+' || echo "?")
+    echo "  $pod: SMs=${SMS}, throughput=${GFLOPS} GFLOPS"
+done
+echo "  Note: All 3 pods share the same MIG device with the same 50% SM ceiling."
+echo "  Server-side config (defaultActiveThreadPercentage) is per-daemon, not per-client."
+echo "  → Works as a global cap, but cannot differentiate per-pod."
 
 RUNNING_A=$(kubectl get pods --no-headers 2>/dev/null | grep 'm11-1a-pod' | grep -c 'Running' || true)
 echo ""
 if [ "$RUNNING_A" -eq 3 ]; then
-    echo "  --> ✅ All 3 pods running: daemon-level 50% SM limit, pods share equally"
+    echo "  --> All 3 pods sharing 1 MIG device with daemon-level 50% SM ceiling"
 else
-    echo "  --> ⚠ Only $RUNNING_A/3 pods running"
+    echo "  --> Only $RUNNING_A/3 pods running"
 fi
 
 echo ""
@@ -138,9 +160,10 @@ sleep 2
 echo ""
 echo "================================================================"
 echo "  Test 11-1b: Client-Side SM Limit"
+echo "  Daemon ceiling: 100% (no server-side limit)"
 echo "  Pod 1: CUDA_MPS_ACTIVE_THREAD_PERCENTAGE=10 → expect lowest throughput"
 echo "  Pod 2: CUDA_MPS_ACTIVE_THREAD_PERCENTAGE=30 → expect ~3x of Pod 1"
-echo "  Pod 3: CUDA_MPS_ACTIVE_THREAD_PERCENTAGE=50 → expect highest (daemon ceiling)"
+echo "  Pod 3: CUDA_MPS_ACTIVE_THREAD_PERCENTAGE=50 → expect highest"
 echo "================================================================"
 echo "Step 7: Deploying 11-1b (reuses m11-1-cuda ConfigMap)..."
 kubectl apply -f "$MANIFEST_B"
@@ -210,5 +233,5 @@ echo ""
 echo "=== Module 11-1 Complete ==="
 echo ""
 echo "Summary:"
-echo "  11-1a — Server-side SM: daemon-level 50%, 3 pods share equally (~same GFLOPS)"
-echo "  11-1b — Client-side SM: CUDA_MPS_ACTIVE_THREAD_PERCENTAGE controls per-client SMs and throughput"
+echo "  11-1a — Server-side SM: daemon-level 50% ceiling on 1 shared claim → all 3 pods see ~equal throughput (per-daemon, not per-client)"
+echo "  11-1b — Client-side SM: 10/30/50% via env var on 1 shared claim → proportional throughput per-pod (true per-client control)"
