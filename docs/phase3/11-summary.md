@@ -27,7 +27,7 @@ Module 11 explores the boundary conditions of NVIDIA DRA with MPS sharing on MIG
 
 1. **`GpuConfig` vs `MigDeviceConfig`**: The DRA driver uses different config types for full GPUs and MIG devices. Using `kind: GpuConfig` with `mig.nvidia.com` devices causes the driver to silently fall back to `DefaultMigDeviceConfig()` (TimeSlicing, no MPS). **You must use `kind: MigDeviceConfig`** for MIG devices to enable MPS sharing.
 
-2. **MPS memory limit is ineffective on MIG (DRA driver bug)**: `defaultPinnedDeviceMemoryLimit` is silently ignored on MIG devices (11-2a). Root cause: config timing + EXCLUSIVE_PROCESS incompatibility. Workaround: client-side `CUDA_MPS_PINNED_DEVICE_MEM_LIMIT` env var (11-2b).
+2. **MPS memory limit is ineffective on MIG (MIG × MPS incompatibility)**: `defaultPinnedDeviceMemoryLimit` is silently ignored on MIG devices (11-2a). Root cause: `EXCLUSIVE_PROCESS` mode — required for MPS server-side memory accounting — is not supported on MIG-enabled GPUs. The DRA driver's `setComputeMode("EXCLUSIVE_PROCESS")` call silently fails; the daemon startup sequence itself is correct by design (works on non-MIG GPUs). Workaround: client-side `CUDA_MPS_PINNED_DEVICE_MEM_LIMIT` env var (11-2b).
 
 3. **Client-side env vars provide reliable per-pod resource isolation on MIG**: Both `CUDA_MPS_ACTIVE_THREAD_PERCENTAGE` (11-1b) and `CUDA_MPS_PINNED_DEVICE_MEM_LIMIT` (11-2b) work correctly on MIG. The 11-1 paired experiment compares server-side uniform ceiling (11-1a: all pods see 20 SMs) vs. client-side per-pod differentiation (11-1b: 10/30/50%). The 11-2 paired experiment uses the same allocation sizes (4.5/3/3 GiB at 4 GiB limit) to compare server-side vs. client-side VRAM enforcement.
 
